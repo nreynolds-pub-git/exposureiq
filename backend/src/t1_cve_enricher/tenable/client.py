@@ -230,27 +230,31 @@ class TenableClient:
 
     async def export_findings(
         self,
-        source: str,
+        asset_ids: list[str],
         severities: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Export findings for a given source via the async export API.
+        """Export findings for a given list of asset IDs via the async export API.
 
-        Filters to CVE-shaped findings (any severity by default). The caller
-        is responsible for further filtering to CVE-named detections.
+        The findings export endpoint does NOT accept `products` as a filter
+        (the API returns `Export column 'products' is not supported`). Callers
+        should resolve a source to its asset_ids first via
+        `list_asset_ids_for_source()`, then pass that list here.
 
         Returns a list of raw finding records as returned by the export
         chunks. The findings_extractor worker handles persistence.
         """
+        if not asset_ids:
+            return []
         severities = severities or ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
         filters = [
-            {"property": "products", "operator": "=", "value": [source]},
+            {"property": "asset_id", "operator": "=", "value": asset_ids},
             {"property": "finding_severity", "operator": "=", "value": severities},
         ]
 
         export_id = await self._initiate_export(filters)
-        logger.info("export started", source=source, export_id=export_id)
+        logger.info("export started", asset_count=len(asset_ids), export_id=export_id)
         chunk_ids = await self._wait_for_export(export_id)
-        logger.info("export finished", source=source, chunks=len(chunk_ids))
+        logger.info("export finished", export_id=export_id, chunks=len(chunk_ids))
 
         all_records: list[dict[str, Any]] = []
         for chunk_id in chunk_ids:
@@ -258,8 +262,39 @@ class TenableClient:
             all_records.extend(records)
             logger.debug("chunk downloaded", export_id=export_id, chunk_id=chunk_id, n=len(records))
 
-        logger.info("export complete", source=source, total_records=len(all_records))
+        logger.info("export complete", export_id=export_id, total_records=len(all_records))
         return all_records
+
+    async def list_asset_ids_for_source(self, source_value: str, max_assets: int = 50000) -> list[str]:
+        """Return the asset_ids for a given source. Paginates internally.
+
+        `source_value` is the `products` enum value (e.g. 'SENTINEL-ONE:EDR'),
+        not the friendly display name.
+        """
+        asset_ids: list[str] = []
+        offset = 0
+        page_size = 1000
+        while offset < max_assets:
+            body = {
+                "filters": [
+                    {"property": "products", "operator": "=", "value": [source_value]},
+                ],
+                "limit": page_size,
+                "offset": offset,
+            }
+            data = await self._request("POST", INVENTORY_ASSETS_SEARCH, json_body=body)
+            if not isinstance(data, dict):
+                break
+            records = data.get("data") or []
+            for asset in records:
+                aid = asset.get("id") or asset.get("asset_id")
+                if aid:
+                    asset_ids.append(aid)
+            total = int((data.get("pagination") or {}).get("total", 0) or 0)
+            offset += len(records)
+            if not records or offset >= total:
+                break
+        return asset_ids
 
     async def _initiate_export(self, filters: list[dict[str, Any]]) -> str:
         body = {"filters": filters}
@@ -329,12 +364,17 @@ async def _cli_smoke_test() -> None:
         # Smoke-test the export pipeline on the smallest source so we don't
         # accidentally pull tens of thousands of findings.
         smallest = min(sources, key=lambda s: s["asset_count"])
-        print(f"\nExporting findings for '{smallest['name']}' ({smallest['value']})…")
-        records = await client.export_findings(smallest["value"])
+        print(f"\nResolving asset IDs for '{smallest['name']}' ({smallest['value']})…")
+        asset_ids = await client.list_asset_ids_for_source(smallest["value"])
+        print(f"  ✓ {len(asset_ids)} asset IDs")
+
+        print(f"\nExporting findings for those assets…")
+        records = await client.export_findings(asset_ids)
         print(f"  ✓ pulled {len(records)} finding records")
         if records:
             sample = records[0]
-            print(f"  sample keys: {sorted(sample.keys())[:10]}")
+            print(f"  sample keys: {sorted(sample.keys())[:15]}")
+            print(f"  sample record: {sample}")
 
 
 def main() -> None:
