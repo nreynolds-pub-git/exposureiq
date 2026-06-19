@@ -222,9 +222,9 @@ class TenableClient:
             return 0
         if not isinstance(data, dict):
             return 0
-        # Response includes pagination metadata. Field names observed: "total",
-        # sometimes "totalCount". Try both.
-        return int(data.get("total", data.get("totalCount", 0)) or 0)
+        # Response shape: {"data": [...], "pagination": {"total": N, ...}}
+        pagination = data.get("pagination") or {}
+        return int(pagination.get("total", 0) or 0)
 
     # --- Findings export ---
 
