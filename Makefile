@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help install install-backend install-frontend run run-backend run-frontend \
-        pull test test-backend test-frontend lint lint-backend lint-frontend \
+        pull smoke-test test test-backend test-frontend lint lint-backend lint-frontend \
         format format-backend format-frontend clean docker-up docker-down
 
 PYTHON ?= python3
@@ -33,6 +33,9 @@ run-frontend:  ## Run Vite frontend dev server
 
 pull:  ## Trigger an on-demand pipeline run
 	$(PYTHON) -m t1_cve_enricher.workers.scheduler --run-now
+
+smoke-test:  ## Verify Tenable API connectivity and list third-party sources
+	$(PYTHON) -m t1_cve_enricher.tenable.client
 
 # --- Test / lint / format ---
 
