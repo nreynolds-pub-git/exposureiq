@@ -150,10 +150,8 @@ class TenableClient:
         auth and basic inventory access work.
         """
         logger.info("testing tenable connection", base_url=self._settings.tenable_base_url)
-        data = await self._request("GET", INVENTORY_ASSETS_PROPERTIES)
-        # The response shape is `{"properties": [...]}` based on the MCP
-        # response we observed. Handle both shapes defensively.
-        properties = data.get("properties", data) if isinstance(data, dict) else data
+        response = await self._request("GET", INVENTORY_ASSETS_PROPERTIES)
+        properties = response.get("data", []) if isinstance(response, dict) else []
         count = len(properties) if isinstance(properties, list) else 0
         return {"status": "ok", "asset_properties_returned": count}
 
@@ -163,46 +161,46 @@ class TenableClient:
         """Return distinct third-party data sources currently in the tenant.
 
         Strategy:
-            1. Hit the properties endpoint to get the enumerated `products`
-               values (the user-facing data-source dimension).
-            2. For each candidate, do a small asset search filtered by that
-               product to get a current count.
-            3. Return entries that are NOT Tenable-native and have asset_count > 0.
+            1. Hit the assets/properties endpoint, find the `products` property.
+            2. Walk its `control.selection` list, keeping entries where
+               `third_party == True` and `deprecated != True`.
+            3. For each candidate, do a count query and return only those
+               with at least one asset.
 
         Returns a list of dicts shaped as:
-            { "name": "SentinelOne", "asset_count": 11 }
+            { "name": "SentinelOne", "value": "SENTINELONE:EDR", "asset_count": 11 }
+
+        `name` is for display; `value` is the API identifier used for filtering.
         """
         logger.info("listing third-party data sources")
-        data = await self._request("GET", INVENTORY_ASSETS_PROPERTIES)
-        properties = data.get("properties", data) if isinstance(data, dict) else data
-        if not isinstance(properties, list):
-            raise TenableApiError(f"Unexpected properties response shape: {type(data)}")
+        response = await self._request("GET", INVENTORY_ASSETS_PROPERTIES)
+        if not isinstance(response, dict) or "data" not in response:
+            raise TenableApiError(f"Unexpected properties response shape: {response!r}")
 
-        # Pull the enumerated `products` (preferred) or `sources` (fallback) values.
-        # Different tenant versions use one or the other as the canonical field.
-        candidates: list[str] = []
-        for prop in properties:
-            name = prop.get("key") or prop.get("name") or prop.get("property")
-            if name in ("products", "sources"):
-                values = prop.get("values") or prop.get("enum") or []
-                # Values can be a list of dicts ({"name":"X","value":"X"}) or strings.
-                for v in values:
-                    if isinstance(v, dict):
-                        candidates.append(v.get("value") or v.get("name") or "")
-                    elif isinstance(v, str):
-                        candidates.append(v)
-                if candidates:
-                    break
+        # Find the `products` property — that's the user-facing source dimension.
+        # `sources` exists but is legacy and all values are deprecated.
+        products_prop = next(
+            (p for p in response["data"] if p.get("key") == "products"),
+            None,
+        )
+        if products_prop is None:
+            logger.warning("no 'products' property found in inventory schema")
+            return []
 
-        third_party = [c for c in candidates if c and c not in TENABLE_NATIVE_SOURCES]
-        logger.info("found candidate sources", count=len(third_party))
+        selection = products_prop.get("control", {}).get("selection", []) or []
+        candidates = [
+            {"name": item.get("name", ""), "value": item.get("value", "")}
+            for item in selection
+            if item.get("third_party") is True and item.get("deprecated") is not True
+        ]
+        logger.info("found candidate sources", count=len(candidates))
 
         # Get a count for each so we can return only the ones with data.
         sources: list[dict[str, Any]] = []
-        for name in third_party:
-            count = await self._count_assets_for_source(name)
+        for c in candidates:
+            count = await self._count_assets_for_source(c["value"])
             if count > 0:
-                sources.append({"name": name, "asset_count": count})
+                sources.append({"name": c["name"], "value": c["value"], "asset_count": count})
 
         sources.sort(key=lambda s: s["name"])
         logger.info("active third-party sources", count=len(sources))
@@ -326,13 +324,13 @@ async def _cli_smoke_test() -> None:
             print("  (none found — your tenant has no third-party data sources)")
             return
         for src in sources:
-            print(f"  • {src['name']:<30} {src['asset_count']:>6} assets")
+            print(f"  • {src['name']:<30} {src['value']:<22} {src['asset_count']:>6} assets")
 
         # Smoke-test the export pipeline on the smallest source so we don't
         # accidentally pull tens of thousands of findings.
         smallest = min(sources, key=lambda s: s["asset_count"])
-        print(f"\nExporting findings for '{smallest['name']}' (sanity check)…")
-        records = await client.export_findings(smallest["name"])
+        print(f"\nExporting findings for '{smallest['name']}' ({smallest['value']})…")
+        records = await client.export_findings(smallest["value"])
         print(f"  ✓ pulled {len(records)} finding records")
         if records:
             sample = records[0]
