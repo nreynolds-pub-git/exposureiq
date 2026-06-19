@@ -40,11 +40,13 @@ logger = structlog.get_logger(__name__)
 # These map to the Tenable One Inventory API. If Tenable changes the URL
 # structure these constants are the only thing that should need updating.
 
-INVENTORY_PROPERTIES = "/inventory/api/v1/properties"
-INVENTORY_ASSETS_SEARCH = "/inventory/api/v1/assets/search"
-FINDINGS_EXPORT_INITIATE = "/inventory/api/v1/findings/export"
-FINDINGS_EXPORT_STATUS = "/inventory/api/v1/findings/export/{export_id}"
-FINDINGS_EXPORT_CHUNK = "/inventory/api/v1/findings/export/{export_id}/chunks/{chunk_id}"
+INVENTORY_ASSETS_PROPERTIES = "/api/v1/t1/inventory/assets/properties"
+INVENTORY_FINDINGS_PROPERTIES = "/api/v1/t1/inventory/findings/properties"
+INVENTORY_ASSETS_SEARCH = "/api/v1/t1/inventory/assets/search"
+INVENTORY_FINDINGS_SEARCH = "/api/v1/t1/inventory/findings/search"
+FINDINGS_EXPORT_INITIATE = "/api/v1/t1/inventory/export/findings"
+EXPORT_STATUS = "/api/v1/t1/inventory/export/{export_id}/status"
+EXPORT_CHUNK = "/api/v1/t1/inventory/export/{export_id}/download/{chunk_id}"
 
 # Sources that are Tenable's own data, not third-party connectors. We exclude
 # these from `list_sources()` since enriching Tenable's own findings against
@@ -144,15 +146,11 @@ class TenableClient:
     async def test_connection(self) -> dict[str, Any]:
         """Sanity check used by the CLI smoke test.
 
-        Calls the properties endpoint, which is cheap and proves both auth
-        and basic inventory access work.
+        Calls the assets properties endpoint, which is cheap and proves both
+        auth and basic inventory access work.
         """
         logger.info("testing tenable connection", base_url=self._settings.tenable_base_url)
-        data = await self._request(
-            "GET",
-            INVENTORY_PROPERTIES,
-            params={"entity_type": "assets"},
-        )
+        data = await self._request("GET", INVENTORY_ASSETS_PROPERTIES)
         # The response shape is `{"properties": [...]}` based on the MCP
         # response we observed. Handle both shapes defensively.
         properties = data.get("properties", data) if isinstance(data, dict) else data
@@ -175,11 +173,7 @@ class TenableClient:
             { "name": "SentinelOne", "asset_count": 11 }
         """
         logger.info("listing third-party data sources")
-        data = await self._request(
-            "GET",
-            INVENTORY_PROPERTIES,
-            params={"entity_type": "assets"},
-        )
+        data = await self._request("GET", INVENTORY_ASSETS_PROPERTIES)
         properties = data.get("properties", data) if isinstance(data, dict) else data
         if not isinstance(properties, list):
             raise TenableApiError(f"Unexpected properties response shape: {type(data)}")
@@ -281,7 +275,7 @@ class TenableClient:
 
     async def _wait_for_export(self, export_id: str) -> list[int]:
         """Poll the export status until it finishes. Returns the chunk IDs."""
-        path = FINDINGS_EXPORT_STATUS.format(export_id=export_id)
+        path = EXPORT_STATUS.format(export_id=export_id)
         for attempt in range(EXPORT_POLL_MAX_ATTEMPTS):
             data = await self._request("GET", path)
             status = (data or {}).get("status", "").upper()
@@ -300,7 +294,7 @@ class TenableClient:
         )
 
     async def _download_chunk(self, export_id: str, chunk_id: int) -> list[dict[str, Any]]:
-        path = FINDINGS_EXPORT_CHUNK.format(export_id=export_id, chunk_id=chunk_id)
+        path = EXPORT_CHUNK.format(export_id=export_id, chunk_id=chunk_id)
         data = await self._request("GET", path)
         if isinstance(data, list):
             return data
