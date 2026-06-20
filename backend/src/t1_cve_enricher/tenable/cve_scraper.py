@@ -22,6 +22,7 @@ Design points:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import ssl
@@ -151,92 +152,97 @@ class CveScraper:
         return self._parse(cve_id, response.text)
 
     def _parse(self, cve_id: str, html: str) -> CveIntel:
-        """Parse the HTML of a tenable.com CVE page.
+        """Parse the __NEXT_DATA__ JSON embedded in a tenable.com CVE page.
 
-        NOTE: the exact selectors will need verification against a live page —
-        the markup may have changed since this scaffold was written. The
-        functions below encapsulate each field so they're easy to fix in
-        isolation when the time comes.
+        Tenable's CVE pages are server-side rendered by Next.js. All structured
+        CVE data is in the <script id="__NEXT_DATA__"> JSON blob, not in the
+        rendered HTML. Parsing the JSON is more reliable than selector-scraping.
+
+        VPR score and remediation text are intentionally not extracted: they
+        are not exposed on public CVE pages (verified against CVE-2021-44228 /
+        Log4Shell). They remain on CveIntel for downstream compatibility but
+        are always None when populated by this scraper. Authenticated VPR/
+        remediation lookup can be added later as a second pass once Tenable's
+        Vulnerability Intelligence API is available.
         """
-        soup = BeautifulSoup(html, "lxml")
         intel = CveIntel(
             cve_id=cve_id,
             raw_html=html,
             fetched_at=datetime.now(timezone.utc),
             fetch_status="OK",
         )
+
+        soup = BeautifulSoup(html, "lxml")
+        node = soup.find("script", id="__NEXT_DATA__")
+        if node is None or not node.string:
+            logger.warning("cve page has no __NEXT_DATA__ blob", cve_id=cve_id)
+            intel.fetch_status = "ERROR"
+            return intel
+
         try:
-            intel.description = self._parse_description(soup)
-            intel.cvss3_base_score, intel.cvss3_severity = self._parse_cvss(soup, "3")
-            intel.cvss2_base_score, intel.cvss2_severity = self._parse_cvss(soup, "2")
-            intel.vpr_score, intel.vpr_severity = self._parse_vpr(soup)
-            intel.epss_score = self._parse_epss(soup)
-            intel.remediation = self._parse_remediation(soup)
-            intel.published_date = self._parse_date(soup, "Published")
-            intel.last_modified_date = self._parse_date(soup, "Updated")
-        except Exception as exc:  # noqa: BLE001 — we want fail-soft here
+            blob = json.loads(node.string)
+            page_props = blob.get("props", {}).get("pageProps", {})
+            # A rejected CVE has deprecated=True but is still populated, so
+            # only treat explicit errorStatus as a real not-found signal.
+            if page_props.get("errorStatus"):
+                intel.fetch_status = "NOT_FOUND"
+                return intel
+            cve = page_props.get("cve")
+            if not isinstance(cve, dict):
+                logger.warning("cve page has no cve object", cve_id=cve_id)
+                intel.fetch_status = "ERROR"
+                return intel
+
+            intel.description = _clean_str(cve.get("description"))
+            intel.cvss3_base_score = _safe_float(cve.get("cvss3_base_score"))
+            intel.cvss3_severity = _normalize_severity(cve.get("cvss3_severity"))
+            intel.cvss2_base_score = _safe_float(cve.get("cvss2_base_score"))
+            intel.cvss2_severity = _normalize_severity(cve.get("cvss2_severity"))
+            intel.epss_score = _safe_float(cve.get("epss_score"))
+            intel.published_date = _iso_date(
+                cve.get("publication_date") or cve.get("nvd_published")
+            )
+            intel.last_modified_date = _iso_date(cve.get("nvd_modified"))
+            # Not available on the public page; kept for dataclass compat.
+            intel.vpr_score = None
+            intel.vpr_severity = None
+            intel.remediation = None
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             logger.warning("cve parse failed", cve_id=cve_id, error=str(exc))
             intel.fetch_status = "ERROR"
+
         return intel
 
-    # --- field parsers (selectors are best-effort; verify against live page) ---
 
-    def _parse_description(self, soup: BeautifulSoup) -> str | None:
-        for selector in ['[data-testid="cve-description"]', "section.description", "p.description"]:
-            el = soup.select_one(selector)
-            if el and el.get_text(strip=True):
-                return el.get_text(strip=True)
+def _safe_float(v: object) -> float | None:
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
         return None
 
-    def _parse_cvss(self, soup: BeautifulSoup, version: str) -> tuple[float | None, str | None]:
-        # Placeholder — tune selectors after inspecting an actual CVE page.
-        label = f"CVSSv{version}"
-        for el in soup.find_all(string=re.compile(label, re.IGNORECASE)):
-            container = el.parent
-            text = container.get_text(" ", strip=True) if container else ""
-            match = re.search(r"(\d+\.\d+)\s*\(?(CRITICAL|HIGH|MEDIUM|LOW)?\)?", text, re.I)
-            if match:
-                score = float(match.group(1))
-                severity = match.group(2).upper() if match.group(2) else None
-                return score, severity
-        return None, None
 
-    def _parse_vpr(self, soup: BeautifulSoup) -> tuple[float | None, str | None]:
-        for el in soup.find_all(string=re.compile(r"\bVPR\b", re.IGNORECASE)):
-            container = el.parent
-            text = container.get_text(" ", strip=True) if container else ""
-            match = re.search(r"(\d+\.\d+)\s*\(?(CRITICAL|HIGH|MEDIUM|LOW)?\)?", text, re.I)
-            if match:
-                score = float(match.group(1))
-                severity = match.group(2).upper() if match.group(2) else None
-                return score, severity
-        return None, None
-
-    def _parse_epss(self, soup: BeautifulSoup) -> float | None:
-        for el in soup.find_all(string=re.compile(r"\bEPSS\b", re.IGNORECASE)):
-            container = el.parent
-            text = container.get_text(" ", strip=True) if container else ""
-            match = re.search(r"(\d+\.\d+(?:e-?\d+)?)", text)
-            if match:
-                return float(match.group(1))
+def _clean_str(v: object) -> str | None:
+    if v is None:
         return None
+    s = str(v).strip()
+    return s or None
 
-    def _parse_remediation(self, soup: BeautifulSoup) -> str | None:
-        for selector in [
-            '[data-testid="cve-remediation"]',
-            "section.remediation",
-            "section#solution",
-        ]:
-            el = soup.select_one(selector)
-            if el and el.get_text(strip=True):
-                return el.get_text(" ", strip=True)
-        return None
 
-    def _parse_date(self, soup: BeautifulSoup, label: str) -> str | None:
-        for el in soup.find_all(string=re.compile(label, re.IGNORECASE)):
-            container = el.parent
-            text = container.get_text(" ", strip=True) if container else ""
-            match = re.search(r"(\d{4}-\d{2}-\d{2})", text)
-            if match:
-                return match.group(1)
+def _normalize_severity(v: object) -> str | None:
+    """Normalize 'Critical'/'High'/etc. to upper-case canonical form."""
+    if not v:
         return None
+    s = str(v).strip().upper()
+    return s if s in {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "NONE"} else None
+
+
+def _iso_date(v: object) -> str | None:
+    """Return YYYY-MM-DD from a Tenable-style ISO timestamp, or None."""
+    if not v:
+        return None
+    s = str(v)
+    if len(s) >= 10 and s[4] == "-" and s[7] == "-":
+        return s[:10]
+    return None

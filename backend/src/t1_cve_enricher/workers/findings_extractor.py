@@ -116,7 +116,11 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
     logger.info("pulling source", source=source)
     async with TenableClient(settings) as client:
         assets = await _pull_assets_for_source(client, source)
-        findings = await client.export_findings(source)
+        asset_ids = list(assets.keys())
+        if not asset_ids:
+            logger.warning("source has no assets; skipping findings export", source=source)
+            return 0
+        findings = await client.export_findings(asset_ids=asset_ids)
 
     cve_findings = []
     for f in findings:
