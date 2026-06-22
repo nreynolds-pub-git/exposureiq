@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from t1_cve_enricher.api.export import build_csv_response, build_json_response
 from t1_cve_enricher.config import get_settings
 from t1_cve_enricher.db import get_connection
+from t1_cve_enricher.enrichment.plugin_matcher import pick_best_plugin
 from t1_cve_enricher.workers.scheduler import run_pipeline
 
 logger = structlog.get_logger(__name__)
@@ -58,6 +59,9 @@ class EnrichedFinding(BaseModel):
     vpr_severity: str | None
     remediation: str | None
     enriched: bool
+    plugin_id: str | None = None
+    plugin_family: str | None = None
+    plugin_platform_match: bool | None = None
 
 
 class SeverityCounts(BaseModel):
@@ -168,9 +172,26 @@ def list_findings(
     sql, params = _build_findings_query(source, cve, asset, severity, state, enriched)
     sql += " ORDER BY f.severity, f.last_observed DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
+    results: list[EnrichedFinding] = []
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
-    return [EnrichedFinding(**{**dict(r), "enriched": bool(r["enriched"])}) for r in rows]
+        for r in rows:
+            fields = dict(r)
+            fields["enriched"] = bool(r["enriched"])
+            plugin = pick_best_plugin(conn, r["cve_id"], r["source"])
+            if plugin:
+                fields["vpr_score"] = plugin["vpr_score"]
+                fields["vpr_severity"] = plugin["vpr_severity"]
+                fields["remediation"] = plugin["solution"]
+                fields["plugin_id"] = plugin["plugin_id"]
+                fields["plugin_family"] = plugin["script_family"]
+                fields["plugin_platform_match"] = plugin["platform_match"]
+            else:
+                fields["plugin_id"] = None
+                fields["plugin_family"] = None
+                fields["plugin_platform_match"] = None
+            results.append(EnrichedFinding(**fields))
+    return results
 
 
 @router.get("/findings/export")

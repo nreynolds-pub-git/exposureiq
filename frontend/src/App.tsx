@@ -76,8 +76,10 @@ export default function App() {
       </main>
 
       <footer className="border-t border-white/10 px-6 py-3 text-xs text-white/40">
-        Showing {findings.data?.length ?? 0} findings · enrichment cached locally · scrapes
+        Showing {findings.data?.length ?? 0} findings · enrichment cached locally · CVE intel from
         <code className="ml-1 rounded bg-white/10 px-1 py-0.5">tenable.com/cve/&#123;ID&#125;</code>
+        and plugin data from
+        <code className="ml-1 rounded bg-white/10 px-1 py-0.5">tenable.com/plugins/api/v1/</code>
       </footer>
     </div>
   );

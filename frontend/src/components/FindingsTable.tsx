@@ -37,6 +37,7 @@ export function FindingsTable({ findings, loading }: Props) {
             <th className="px-3 py-2">Source</th>
             <th className="px-3 py-2">VPR</th>
             <th className="px-3 py-2">CVSSv3</th>
+            <th className="px-3 py-2">Fix Source</th>
             <th className="px-3 py-2">Remediation</th>
           </tr>
         </thead>
@@ -77,6 +78,20 @@ export function FindingsTable({ findings, loading }: Props) {
               <td className="px-3 py-2 text-white/80">{f.source}</td>
               <td className="px-3 py-2">{f.vpr_score?.toFixed(1) ?? '—'}</td>
               <td className="px-3 py-2">{f.cvss3_base_score?.toFixed(1) ?? '—'}</td>
+              <td className="px-3 py-2 text-xs">
+                {f.plugin_family ? (
+                  <div className="flex items-center gap-1">
+                    <span className={f.plugin_platform_match ? 'text-white/80' : 'text-data-orange'}>
+                      {f.plugin_family.replace(/ Local Security Checks$/, '')}
+                    </span>
+                    {f.plugin_platform_match === false && (
+                      <span title="No platform-specific plugin found; best-effort cross-platform match" className="text-data-orange">⚠</span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-white/30">—</span>
+                )}
+              </td>
               <td className="px-3 py-2 max-w-md">
                 {f.enriched ? (
                   <span className="line-clamp-2 text-white/80">

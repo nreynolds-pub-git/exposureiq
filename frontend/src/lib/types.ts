@@ -27,6 +27,9 @@ export interface EnrichedFinding {
   vpr_severity: string | null;
   remediation: string | null;
   enriched: boolean;
+  plugin_id: string | null;
+  plugin_family: string | null;
+  plugin_platform_match: boolean | null;
 }
 
 export interface SeverityCounts {
