@@ -61,10 +61,11 @@ export function FindingsTable({ findings, loading }: Props) {
               </td>
               <td className="px-3 py-2 font-mono text-tenable-yellow">
                 <a
-                  href={`https://www.tenable.com/cve/${f.cve_id}`}
+                  href={`https://cloud.tenable.com/vm/#/vuln-intelligence/${f.cve_id}?affected=assets&info=events`}
                   target="_blank"
                   rel="noreferrer"
                   className="hover:underline"
+                  title="Open in Tenable Vulnerability Intelligence"
                 >
                   {f.cve_id}
                 </a>
@@ -93,15 +94,34 @@ export function FindingsTable({ findings, loading }: Props) {
                 )}
               </td>
               <td className="px-3 py-2 max-w-md">
-                {f.enriched ? (
-                  <span className="line-clamp-2 text-white/80">
-                    {f.remediation ?? <em className="text-white/40">no guidance</em>}
-                  </span>
-                ) : (
-                  <span className="text-xs uppercase tracking-wider text-data-orange">
-                    Not enriched
-                  </span>
-                )}
+                {(() => {
+                  if (!f.enriched) {
+                    return (
+                      <span className="text-xs uppercase tracking-wider text-data-orange">
+                        Not enriched
+                      </span>
+                    );
+                  }
+                  const noFix =
+                    !f.remediation ||
+                    f.remediation === 'There is no known solution at this time.';
+                  if (noFix) {
+                    return (
+                      <a
+                        href={`https://cloud.tenable.com/vm/#/vuln-intelligence/${f.cve_id}?affected=assets&info=events`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-tenable-yellow hover:underline"
+                        title="No fix from Tenable Research; open Vulnerability Intelligence for more context"
+                      >
+                        → Check Vulnerability Intelligence
+                      </a>
+                    );
+                  }
+                  return (
+                    <span className="line-clamp-2 text-white/80">{f.remediation}</span>
+                  );
+                })()}
               </td>
             </tr>
           ))}
