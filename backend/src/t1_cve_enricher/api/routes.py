@@ -146,7 +146,7 @@ def health() -> dict[str, str]:
 
 
 @router.get("/sources", response_model=list[Source])
-def list_sources() -> list[Source]:
+def list_sources():
     settings = get_settings()
     with get_connection(settings.database_path) as conn:
         rows = conn.execute("SELECT * FROM sources ORDER BY name").fetchall()
@@ -163,7 +163,7 @@ def list_findings(
     enriched: bool | None = None,
     limit: int = Query(default=100, ge=1, le=10000),
     offset: int = Query(default=0, ge=0),
-) -> list[EnrichedFinding]:
+):
     settings = get_settings()
     sql, params = _build_findings_query(source, cve, asset, severity, state, enriched)
     sql += " ORDER BY f.severity, f.last_observed DESC LIMIT ? OFFSET ?"
@@ -243,7 +243,7 @@ async def trigger_refresh(background_tasks: BackgroundTasks) -> dict[str, str]:
 
 
 @router.get("/jobs", response_model=list[PullJob])
-def list_jobs(limit: int = Query(default=20, ge=1, le=200)) -> list[PullJob]:
+def list_jobs(limit: int = Query(default=20, ge=1, le=200)):
     settings = get_settings()
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(

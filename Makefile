@@ -26,7 +26,7 @@ install-frontend:  ## Install frontend dependencies
 run: docker-up  ## Run the full stack (Docker)
 
 run-backend:  ## Run FastAPI dev server with auto-reload
-	cd backend && $(PYTHON) -m uvicorn t1_cve_enricher.main:app --reload --host 0.0.0.0 --port 8000
+	PYTHONPATH=backend/src $(PYTHON) -m uvicorn t1_cve_enricher.main:app --reload --reload-dir backend/src --host 0.0.0.0 --port 8000
 
 run-frontend:  ## Run Vite frontend dev server
 	cd frontend && $(NPM) run dev
