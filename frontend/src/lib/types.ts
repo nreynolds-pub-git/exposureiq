@@ -48,6 +48,7 @@ export interface FilterState {
   severities: Severity[];
   states: FindingState[];
   enrichedOnly: boolean | null;
+  hideNoPlugins: boolean;
 }
 
 export interface PullJob {

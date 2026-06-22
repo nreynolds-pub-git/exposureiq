@@ -16,6 +16,7 @@ function buildQuery(filters: FilterState): URLSearchParams {
   filters.states.forEach((s) => q.append('state', s));
   if (filters.asset) q.set('asset', filters.asset);
   if (filters.enrichedOnly !== null) q.set('enriched', String(filters.enrichedOnly));
+  q.set('hide_no_plugins', String(filters.hideNoPlugins));
   return q;
 }
 

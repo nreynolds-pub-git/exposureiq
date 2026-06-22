@@ -14,6 +14,7 @@ const emptyFilters: FilterState = {
   severities: [],
   states: [],
   enrichedOnly: null,
+  hideNoPlugins: true,
 };
 
 export default function App() {

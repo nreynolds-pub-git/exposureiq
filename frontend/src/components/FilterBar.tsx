@@ -31,6 +31,7 @@ export function FilterBar({ sources, filters, onChange }: Props) {
       severities: [],
       states: [],
       enrichedOnly: null,
+      hideNoPlugins: true,
     });
 
   return (
@@ -117,6 +118,22 @@ export function FilterBar({ sources, filters, onChange }: Props) {
         <option value="true">Enriched only</option>
         <option value="false">Un-enriched only</option>
       </select>
+
+      {/* Hide CVEs Tenable Research hasn't profiled (no plugin coverage) */}
+      <label
+        className="flex items-center gap-2 text-xs text-white/70 hover:text-white"
+        title="Hide findings whose CVE has no Tenable plugin coverage. Tenable Research hasn't profiled these CVEs, so we can't surface remediation. Uncheck to see them anyway."
+      >
+        <input
+          type="checkbox"
+          checked={filters.hideNoPlugins}
+          onChange={(e) =>
+            onChange({ ...filters, hideNoPlugins: e.target.checked })
+          }
+          className="h-3.5 w-3.5 rounded border-white/30 bg-white/5 accent-tenable-yellow"
+        />
+        Hide no-coverage CVEs
+      </label>
 
       <button onClick={clearAll} className="ml-auto text-xs text-white/60 hover:text-white">
         Clear filters

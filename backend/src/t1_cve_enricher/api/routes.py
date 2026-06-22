@@ -94,6 +94,7 @@ def _build_findings_query(
     severities: list[str] | None,
     states: list[str] | None,
     enriched: bool | None,
+    hide_no_plugins: bool | None = True,
 ) -> tuple[str, list[Any]]:
     """Return (sql, params) for the filtered findings query."""
     where: list[str] = []
@@ -121,6 +122,10 @@ def _build_findings_query(
         where.append("c.cve_id IS NOT NULL AND c.fetch_status = 'OK'")
     elif enriched is False:
         where.append("(c.cve_id IS NULL OR c.fetch_status != 'OK')")
+    if hide_no_plugins:
+        where.append(
+            "EXISTS (SELECT 1 FROM cve_plugins cp WHERE cp.cve_id = f.cve_id)"
+        )
 
     sql = """
         SELECT
@@ -165,11 +170,12 @@ def list_findings(
     severity: list[str] | None = Query(default=None),
     state: list[str] | None = Query(default=None),
     enriched: bool | None = None,
+    hide_no_plugins: bool = Query(default=True),
     limit: int = Query(default=100, ge=1, le=10000),
     offset: int = Query(default=0, ge=0),
 ):
     settings = get_settings()
-    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched)
+    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
     sql += " ORDER BY f.severity, f.last_observed DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     results: list[EnrichedFinding] = []
@@ -202,10 +208,11 @@ def export_findings(
     severity: list[str] | None = Query(default=None),
     state: list[str] | None = Query(default=None),
     enriched: bool | None = None,
+    hide_no_plugins: bool = Query(default=True),
     format: str = Query(default="csv", pattern="^(csv|json)$"),
 ) -> Any:
     settings = get_settings()
-    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched)
+    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
     sql += " ORDER BY f.severity, f.last_observed DESC"
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
@@ -233,9 +240,10 @@ def severity_stats(
     severity: list[str] | None = Query(default=None),
     state: list[str] | None = Query(default=None),
     enriched: bool | None = None,
+    hide_no_plugins: bool = Query(default=True),
 ) -> SeverityCounts:
     settings = get_settings()
-    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched)
+    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
     counts = SeverityCounts()
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
