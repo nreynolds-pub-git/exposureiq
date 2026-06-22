@@ -84,3 +84,43 @@ CREATE TABLE IF NOT EXISTS pull_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pull_jobs_started_at ON pull_jobs(started_at DESC);
+
+-- =============================================================================
+-- Plugin enrichment (v2 feature) -- added in plugin-enricher session
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS plugins (
+    plugin_id TEXT PRIMARY KEY,
+    script_name TEXT,
+    script_family TEXT,
+    plugin_type TEXT,
+    synopsis TEXT,
+    description TEXT,
+    solution TEXT,
+    vpr_score REAL,
+    vpr_severity TEXT,
+    risk_factor TEXT,
+    severity TEXT,
+    cvss3_severity TEXT,
+    cvss2_severity TEXT,
+    cisa_known_exploited_date TEXT,
+    plugin_publication_date TEXT,
+    plugin_modification_date TEXT,
+    raw_json TEXT,
+    fetched_at TIMESTAMP NOT NULL,
+    fetch_status TEXT NOT NULL DEFAULT 'OK'
+);
+
+CREATE INDEX IF NOT EXISTS idx_plugins_family ON plugins(script_family);
+CREATE INDEX IF NOT EXISTS idx_plugins_type ON plugins(plugin_type);
+CREATE INDEX IF NOT EXISTS idx_plugins_vpr ON plugins(vpr_score);
+CREATE INDEX IF NOT EXISTS idx_plugins_risk ON plugins(risk_factor);
+CREATE INDEX IF NOT EXISTS idx_plugins_kev ON plugins(cisa_known_exploited_date) WHERE cisa_known_exploited_date IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS cve_plugins (
+    cve_id TEXT NOT NULL,
+    plugin_id TEXT NOT NULL,
+    PRIMARY KEY (cve_id, plugin_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cve_plugins_cve ON cve_plugins(cve_id);
+CREATE INDEX IF NOT EXISTS idx_cve_plugins_plugin ON cve_plugins(plugin_id);

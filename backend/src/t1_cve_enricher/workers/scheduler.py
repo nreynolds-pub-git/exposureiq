@@ -16,7 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from t1_cve_enricher.config import Settings, get_settings
 from t1_cve_enricher.db import get_connection
-from t1_cve_enricher.workers import cve_enricher, findings_extractor, source_discovery
+from t1_cve_enricher.workers import cve_enricher, findings_extractor, plugin_enricher, source_discovery
 
 logger = structlog.get_logger(__name__)
 
@@ -40,6 +40,8 @@ async def run_pipeline(settings: Settings | None = None) -> None:
         sources = await source_discovery.run(settings)
         findings_count = await findings_extractor.run(settings, sources)
         enriched_count = await cve_enricher.run(settings)
+        plugin_count = await plugin_enricher.run(settings)
+        logger.info("pipeline: plugin enrichment done", plugin_count=plugin_count)
         status = "SUCCESS"
         error = None
     except Exception as exc:  # noqa: BLE001
