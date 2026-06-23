@@ -35,6 +35,7 @@ router = APIRouter()
 
 class Source(BaseModel):
     name: str
+    display_name: str | None = None
     first_seen: datetime
     last_seen: datetime
     asset_count: int

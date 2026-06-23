@@ -30,17 +30,19 @@ async def run(settings: Settings) -> list[str]:
     names: list[str] = []
     with get_connection(settings.database_path) as conn:
         for src in sources:
-            name = src["name"]
+            name = src["value"]                 # API filter identifier (e.g. RED-HAT:VM)
+            display_name = src.get("name", "")  # human-readable (e.g. "Red Hat Insights")
             asset_count = src.get("asset_count", 0)
             conn.execute(
                 """
-                INSERT INTO sources (name, first_seen, last_seen, asset_count)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO sources (name, display_name, first_seen, last_seen, asset_count)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(name) DO UPDATE SET
+                    display_name = excluded.display_name,
                     last_seen = excluded.last_seen,
                     asset_count = excluded.asset_count
                 """,
-                (name, now, now, asset_count),
+                (name, display_name, now, now, asset_count),
             )
             names.append(name)
 

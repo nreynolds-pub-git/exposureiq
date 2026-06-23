@@ -45,10 +45,9 @@ def _find_cves_needing_plugin_search(settings: Settings) -> list[str]:
     """Return CVE IDs that are in cve_intel but have no rows in cve_plugins.
 
     A CVE is considered "enriched with plugins" if it has at least one
-    row in cve_plugins — even if that row points to a plugin we couldn't
-    fetch (since the search itself either returned hits or didn't).
-    CVEs with zero plugin matches will be re-searched on every run
-    until we add a "searched, no results" marker (v2).
+    row in cve_plugins. CVEs that returned zero hits or 404 are marked
+    via plugin_search_attempted_at and re-tried only after a 30-day TTL,
+    to catch newly-indexed coverage without daily churn.
     """
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(
@@ -56,7 +55,10 @@ def _find_cves_needing_plugin_search(settings: Settings) -> list[str]:
             SELECT ci.cve_id
             FROM cve_intel ci
             LEFT JOIN cve_plugins cp ON cp.cve_id = ci.cve_id
-            WHERE ci.fetch_status = 'OK' AND cp.cve_id IS NULL
+            WHERE ci.fetch_status = 'OK'
+              AND cp.cve_id IS NULL
+              AND (ci.plugin_search_attempted_at IS NULL
+                   OR ci.plugin_search_attempted_at < datetime('now', '-30 days'))
             ORDER BY ci.cve_id
             """
         ).fetchall()
@@ -127,14 +129,22 @@ async def run(settings: Settings) -> int:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("plugin search failed", cve_id=cve_id, error=str(exc))
                 failed_cves.append(cve_id)
+                with get_connection(settings.database_path) as conn:
+                    conn.execute(
+                        "UPDATE cve_intel SET plugin_search_attempted_at = ? WHERE cve_id = ?",
+                        (now, cve_id),
+                    )
                 continue
 
             if not hits:
-                # CVE has no matching plugins. Insert a sentinel row in
-                # cve_plugins so we don't re-search next run? Decided no:
-                # plugin coverage grows over time as Tenable writes new
-                # plugins, so re-searching empty cases is a feature.
+                # CVE returned zero hits. Stamp the attempt; we'll retry
+                # after the 30-day TTL to catch newly-indexed coverage.
                 logger.debug("no plugins for cve", cve_id=cve_id)
+                with get_connection(settings.database_path) as conn:
+                    conn.execute(
+                        "UPDATE cve_intel SET plugin_search_attempted_at = ? WHERE cve_id = ?",
+                        (now, cve_id),
+                    )
                 continue
 
             with get_connection(settings.database_path) as conn:

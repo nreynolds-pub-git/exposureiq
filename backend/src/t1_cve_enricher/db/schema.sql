@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS cve_intel (
     last_modified_date TEXT,
     raw_html TEXT,
     fetched_at TIMESTAMP NOT NULL,
+    plugin_search_attempted_at TIMESTAMP,
     fetch_status TEXT NOT NULL DEFAULT 'OK'  -- OK / NOT_FOUND / ERROR
 );
 
