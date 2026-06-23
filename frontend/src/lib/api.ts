@@ -17,6 +17,7 @@ function buildQuery(filters: FilterState): URLSearchParams {
   if (filters.asset) q.set('asset', filters.asset);
   if (filters.enrichedOnly !== null) q.set('enriched', String(filters.enrichedOnly));
   q.set('hide_no_plugins', String(filters.hideNoPlugins));
+  if (filters.sort) q.set('sort', filters.sort);
   return q;
 }
 
@@ -33,7 +34,7 @@ export const api = {
     return jsonOrThrow(await fetch(`${BASE}/sources`));
   },
 
-  async listFindings(filters: FilterState, limit = 200, offset = 0): Promise<EnrichedFinding[]> {
+  async listFindings(filters: FilterState, limit = 500, offset = 0): Promise<EnrichedFinding[]> {
     const q = buildQuery(filters);
     q.set('limit', String(limit));
     q.set('offset', String(offset));

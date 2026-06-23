@@ -41,6 +41,7 @@ export function FilterBar({ sources, stats, filters, onChange }: Props) {
       states: [],
       enrichedOnly: null,
       hideNoPlugins: true,
+      sort: '',
     });
 
   return (

@@ -50,6 +50,7 @@ export interface FilterState {
   states: FindingState[];
   enrichedOnly: boolean | null;
   hideNoPlugins: boolean;
+  sort: string;  // "" = default; otherwise "field:asc" or "field:desc"
 }
 
 export interface PullJob {

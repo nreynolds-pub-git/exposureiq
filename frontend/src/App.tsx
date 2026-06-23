@@ -16,10 +16,22 @@ const emptyFilters: FilterState = {
   states: [],
   enrichedOnly: null,
   hideNoPlugins: true,
+  sort: '',
 };
+
+const PAGE_SIZE = 500;
 
 export default function App() {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
+  const [page, setPage] = useState(0);
+
+  // Reset to page 0 whenever filters change so users don't end up on
+  // an out-of-range page after narrowing the result set.
+  // (Wrapped in useEffect-style pattern via setFilters call site below.)
+  const setFiltersResetPage = (next: FilterState) => {
+    setFilters(next);
+    setPage(0);
+  };
 
   const stats = useQuery({
     queryKey: ['stats', filters],
@@ -27,8 +39,8 @@ export default function App() {
   });
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.listSources });
   const findings = useQuery({
-    queryKey: ['findings', filters],
-    queryFn: () => api.listFindings(filters),
+    queryKey: ['findings', filters, page],
+    queryFn: () => api.listFindings(filters, PAGE_SIZE, page * PAGE_SIZE),
   });
 
   const handleRefresh = async () => {
@@ -75,7 +87,44 @@ export default function App() {
         <FindingsTable
           findings={findings.data ?? []}
           loading={findings.isLoading}
+          filters={filters}
+          onFiltersChange={setFiltersResetPage}
         />
+        {(() => {
+          const totalFindings = stats.data
+            ? stats.data.critical + stats.data.high + stats.data.medium + stats.data.low
+            : 0;
+          const totalPages = Math.max(1, Math.ceil(totalFindings / PAGE_SIZE));
+          const start = page * PAGE_SIZE + 1;
+          const end = Math.min((page + 1) * PAGE_SIZE, totalFindings);
+          return (
+            <div className="mt-4 flex items-center justify-between text-xs text-tenable-black/60 dark:text-white/60">
+              <div>
+                Showing {start.toLocaleString()}–{end.toLocaleString()} of{' '}
+                {totalFindings.toLocaleString()} findings
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="rounded-md border border-tenable-black/20 dark:border-white/20 px-2 py-1 disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <span>
+                  Page {page + 1} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="rounded-md border border-tenable-black/20 dark:border-white/20 px-2 py-1 disabled:opacity-30"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </main>
 
       <footer className="border-t border-tenable-black/10 dark:border-white/10 px-6 py-3 text-xs text-tenable-black/50 dark:text-white/40">

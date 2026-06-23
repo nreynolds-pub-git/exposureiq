@@ -1,4 +1,4 @@
-import type { EnrichedFinding, Severity } from '../lib/types';
+import type { EnrichedFinding, FilterState, Severity } from '../lib/types';
 
 const SEVERITY_CLASSES: Record<Severity, string> = {
   CRITICAL: 'bg-sev-critical text-tenable-black',
@@ -11,9 +11,39 @@ const SEVERITY_CLASSES: Record<Severity, string> = {
 interface Props {
   findings: EnrichedFinding[];
   loading: boolean;
+  filters: FilterState;
+  onFiltersChange: (next: FilterState) => void;
 }
 
-export function FindingsTable({ findings, loading }: Props) {
+type SortKey = 'asset' | 'vpr' | 'cvss3';
+
+function nextSortValue(current: string, key: SortKey): string {
+  // Cycle: none -> desc -> asc -> none for the clicked column.
+  // Numeric columns default to desc (worst first); asset name defaults to asc.
+  const [curKey, curDir] = current.split(':');
+  if (curKey !== key) {
+    return key === 'asset' ? `${key}:asc` : `${key}:desc`;
+  }
+  if (curDir === (key === 'asset' ? 'asc' : 'desc')) {
+    return key === 'asset' ? `${key}:desc` : `${key}:asc`;
+  }
+  return ''; // third click clears
+}
+
+function SortIndicator({ active, direction }: { active: boolean; direction: string }) {
+  if (!active) {
+    return <span className="ml-1 text-tenable-black/20 dark:text-white/20">↕</span>;
+  }
+  return (
+    <span className="ml-1 text-tenable-yellow">{direction === 'asc' ? '↑' : '↓'}</span>
+  );
+}
+
+export function FindingsTable({ findings, loading, filters, onFiltersChange }: Props) {
+  const [curKey, curDir] = (filters.sort || '').split(':');
+  const handleSort = (key: SortKey) =>
+    onFiltersChange({ ...filters, sort: nextSortValue(filters.sort, key) });
+
   if (loading) {
     return <div className="text-tenable-black/60 dark:text-white/50">Loading findings…</div>;
   }
@@ -33,10 +63,26 @@ export function FindingsTable({ findings, loading }: Props) {
           <tr>
             <th className="px-3 py-2">Severity</th>
             <th className="px-3 py-2">CVE</th>
-            <th className="px-3 py-2">Asset</th>
+            <th className="px-3 py-2">
+              <button
+                onClick={() => handleSort('asset')}
+                className="inline-flex items-center uppercase tracking-wider hover:text-tenable-black dark:hover:text-white"
+              >
+                Asset
+                <SortIndicator active={curKey === 'asset'} direction={curDir} />
+              </button>
+            </th>
             <th className="px-3 py-2">Source</th>
             <th className="px-3 py-2">VPR</th>
-            <th className="px-3 py-2">CVSSv3</th>
+            <th className="px-3 py-2">
+              <button
+                onClick={() => handleSort('cvss3')}
+                className="inline-flex items-center uppercase tracking-wider hover:text-tenable-black dark:hover:text-white"
+              >
+                CVSSv3
+                <SortIndicator active={curKey === 'cvss3'} direction={curDir} />
+              </button>
+            </th>
             <th className="px-3 py-2">Fix Source</th>
             <th className="px-3 py-2">Remediation</th>
           </tr>
@@ -82,12 +128,9 @@ export function FindingsTable({ findings, loading }: Props) {
               <td className="px-3 py-2 text-xs">
                 {f.plugin_family ? (
                   <div className="flex items-center gap-1">
-                    <span className={f.plugin_platform_match ? 'text-tenable-black/80 dark:text-white/80' : 'text-data-orange'}>
+                    <span className={f.plugin_platform_match ? 'text-tenable-black/80 dark:text-white/80' : 'text-data-purple'}>
                       {f.plugin_family.replace(/ Local Security Checks$/, '')}
                     </span>
-                    {f.plugin_platform_match === false && (
-                      <span title="No platform-specific plugin found; best-effort cross-platform match" className="text-data-orange">⚠</span>
-                    )}
                   </div>
                 ) : (
                   <span className="text-tenable-black/40 dark:text-white/30">—</span>

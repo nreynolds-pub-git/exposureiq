@@ -147,6 +147,70 @@ def _build_findings_query(
     return sql, params
 
 
+# Allowed sort keys mapped to SQL ORDER BY expressions.
+# Keep this a strict whitelist — never interpolate user-supplied sort
+# strings directly into SQL.
+_SORT_EXPRESSIONS: dict[str, str] = {
+    "asset": "a.asset_name COLLATE NOCASE",
+    "cvss3": "c.cvss3_base_score",
+    # "vpr" intentionally not in this map — handled via subquery below
+    "severity": "f.severity",
+}
+
+# CVSS3 etc. are numeric; NULL handling matters.
+_NULLS_LAST_KEYS = {"cvss3", "vpr"}
+
+
+def _build_order_by(sort: str | None) -> str:
+    """Translate sort=key:dir into a safe ORDER BY clause.
+
+    `sort` is in the form "field:asc" or "field:desc" (e.g. "vpr:desc").
+    Returns a string starting with " ORDER BY ..." or the default ordering
+    if sort is None/invalid.
+    """
+    default = " ORDER BY f.severity, f.last_observed DESC"
+    if not sort or ":" not in sort:
+        return default
+    key, _, direction = sort.partition(":")
+    direction = direction.upper()
+    if direction not in ("ASC", "DESC"):
+        return default
+
+    # VPR sort: precompute the max VPR per CVE in a CTE-style WITH clause,
+    # then sort by joining to it. Avoids running a correlated subquery
+    # per row (which was ~4s on the full dataset).
+    #
+    # The sort uses "highest-VPR non-Misc plugin per CVE" semantics —
+    # close to but not identical to the displayed VPR (which is the
+    # platform-matched plugin's VPR).
+    if key == "vpr":
+        nulls = "NULLS LAST" if direction == "DESC" else ""
+        # We rewrite the FROM clause to include a LEFT JOIN to a
+        # subquery; the ORDER BY then sorts on its column. Returning
+        # a single sql-fragment that the caller appends — the caller
+        # uses _build_findings_query then concatenates this.
+        #
+        # However _build_findings_query already produced FROM/JOINs.
+        # Cleanest: use a correlated subquery but cached via a SELECT
+        # alias on the outer query. SQLite's query planner will
+        # materialise it. We do this by injecting a subselect column.
+        return f""" ORDER BY (
+            SELECT max_vpr FROM (
+                SELECT cp.cve_id, MAX(p.vpr_score) AS max_vpr
+                FROM plugins p
+                JOIN cve_plugins cp ON cp.plugin_id = p.plugin_id
+                WHERE COALESCE(p.script_family, '') != 'Misc.'
+                GROUP BY cp.cve_id
+            ) mv WHERE mv.cve_id = f.cve_id
+        ) {direction} {nulls}, f.last_observed DESC"""
+
+    expr = _SORT_EXPRESSIONS.get(key)
+    if not expr:
+        return default
+    nulls = "NULLS LAST" if direction == "DESC" and key in _NULLS_LAST_KEYS else ""
+    return f" ORDER BY {expr} {direction} {nulls}"
+
+
 # --- Routes -------------------------------------------------------------------
 
 
@@ -172,12 +236,13 @@ def list_findings(
     state: list[str] | None = Query(default=None),
     enriched: bool | None = None,
     hide_no_plugins: bool = Query(default=True),
+    sort: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=10000),
     offset: int = Query(default=0, ge=0),
 ):
     settings = get_settings()
     sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
-    sql += " ORDER BY f.severity, f.last_observed DESC LIMIT ? OFFSET ?"
+    sql += _build_order_by(sort) + " LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     results: list[EnrichedFinding] = []
     with get_connection(settings.database_path) as conn:
@@ -210,11 +275,12 @@ def export_findings(
     state: list[str] | None = Query(default=None),
     enriched: bool | None = None,
     hide_no_plugins: bool = Query(default=True),
+    sort: str | None = Query(default=None),
     format: str = Query(default="csv", pattern="^(csv|json)$"),
 ) -> Any:
     settings = get_settings()
     sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
-    sql += " ORDER BY f.severity, f.last_observed DESC"
+    sql += _build_order_by(sort)
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
     data = [dict(r) for r in rows]
