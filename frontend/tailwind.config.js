@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -19,8 +20,8 @@ export default {
         // see ARCHITECTURE.md for rationale)
         'sev-critical': '#FF8837',
         'sev-high': '#E7FF00',
-        'sev-medium': '#4EA5FF',
-        'sev-low': '#71FFC6',
+        'sev-medium': '#71FFC6',
+        'sev-low': '#4EA5FF',
         'sev-info': '#44494B',
       },
       fontFamily: {

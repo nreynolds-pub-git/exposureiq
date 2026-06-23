@@ -1,13 +1,12 @@
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import type { SeverityCounts } from '../lib/types';
+import { useTheme } from '../lib/useTheme';
 
 const SEVERITY_COLORS = {
   Critical: '#FF8837',
   High: '#E7FF00',
-  Medium: '#4EA5FF',
-  Low: '#71FFC6',
-  Info: '#44494B',
-  Unknown: '#888888',
+  Medium: '#71FFC6',
+  Low: '#4EA5FF',
 };
 
 interface Props {
@@ -16,14 +15,14 @@ interface Props {
 }
 
 export function SeverityChart({ counts, loading }: Props) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const data = counts
     ? [
         { name: 'Critical', count: counts.critical },
         { name: 'High', count: counts.high },
         { name: 'Medium', count: counts.medium },
         { name: 'Low', count: counts.low },
-        { name: 'Info', count: counts.info },
-        { name: 'Unknown', count: counts.unknown },
       ]
     : [];
 
@@ -31,32 +30,31 @@ export function SeverityChart({ counts, loading }: Props) {
 
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm uppercase tracking-widest text-white/60">
+      <div className="mb-2">
+        <h2 className="text-sm uppercase tracking-widest text-tenable-black/60 dark:text-white/60">
           Severity distribution
         </h2>
-        <div className="text-xs text-white/50">
-          {loading ? 'Loading…' : `${total.toLocaleString()} findings in view`}
-        </div>
       </div>
       <div className="h-32 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
             <XAxis
               dataKey="name"
-              tick={{ fill: '#FFFFFFCC', fontSize: 12 }}
-              axisLine={{ stroke: '#FFFFFF22' }}
+              tick={{ fill: isDark ? '#FFFFFFCC' : '#1E2426CC', fontSize: 12 }}
+              axisLine={{ stroke: isDark ? '#FFFFFF22' : '#1E242622' }}
               tickLine={false}
             />
             <Tooltip
-              cursor={{ fill: '#FFFFFF10' }}
+              cursor={{ fill: isDark ? '#FFFFFF10' : '#1E242610' }}
               contentStyle={{
-                background: '#1E2426',
-                border: '1px solid #FFFFFF22',
+                background: isDark ? '#1E2426' : '#FFFFFF',
+                border: `1px solid ${isDark ? '#FFFFFF22' : '#1E242622'}`,
                 borderRadius: 6,
                 fontSize: 12,
+                color: isDark ? '#FFFFFF' : '#1E2426',
               }}
-              labelStyle={{ color: '#FFFFFF' }}
+              labelStyle={{ color: isDark ? '#FFFFFF' : '#1E2426', fontWeight: 600 }}
+              itemStyle={{ color: isDark ? '#FFFFFFCC' : '#1E2426CC' }}
             />
             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
               {data.map((entry) => (

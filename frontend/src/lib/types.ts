@@ -2,7 +2,8 @@ export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 export type FindingState = 'ACTIVE' | 'RESURFACED' | 'FIXED';
 
 export interface Source {
-  name: string;
+  name: string;                  // API filter code (RED-HAT:VM)
+  display_name?: string | null;  // human label (Red Hat Insights)
   first_seen: string;
   last_seen: string;
   asset_count: number;

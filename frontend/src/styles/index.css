@@ -22,9 +22,9 @@
     @apply btn bg-tenable-yellow text-tenable-black hover:bg-opacity-90;
   }
   .btn-secondary {
-    @apply btn border border-white/20 text-white hover:bg-white/5;
+    @apply btn border border-tenable-black/20 dark:border-white/20 text-tenable-black dark:text-white hover:bg-tenable-black/5 dark:hover:bg-white/5;
   }
   .panel {
-    @apply rounded-lg border border-white/10 bg-white/5 p-4;
+    @apply rounded-lg border border-tenable-black/10 dark:border-white/10 bg-tenable-black/5 dark:bg-white/5 p-4;
   }
 }
