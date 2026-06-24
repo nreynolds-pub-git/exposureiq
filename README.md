@@ -1,4 +1,4 @@
-# t1-cve-enricher
+# ExposureIQ for Tenable One
 
 > A self-hosted SE remediation accelerator: pulls CVE-shaped findings from third-party connectors in Tenable One, joins them with Tenable's public CVE intelligence, and surfaces them in a filterable web UI with on-demand AI explanations.
 
@@ -12,11 +12,11 @@
 
 Tenable One ingests findings from third-party security tools (EDR, CSPM, cloud, SCA, etc.) so customers can see their full exposure picture in one place. When those third-party tools report findings as CVE identifiers, the CVEs arrive with the asset and severity, but without the deeper context that helps an analyst decide what to do — VPR, exploit availability, fix guidance, platform-specific remediation.
 
-**`t1-cve-enricher` closes that workflow gap.** It pulls CVE-shaped findings from third-party connectors, joins each CVE against Tenable's public CVE database, matches each finding to the most appropriate Tenable plugin for its source platform, and presents the result in a filterable web UI. With an LLM API key, it can also generate a plain-language explanation of any finding on demand.
+**ExposureIQ closes that workflow gap.** It pulls CVE-shaped findings from third-party connectors, joins each CVE against Tenable's public CVE database, matches each finding to the most appropriate Tenable plugin for its source platform, and presents the result in a filterable web UI. With an LLM API key, it can also generate a plain-language explanation of any finding on demand.
 
 ## How it's deployed
 
-`t1-cve-enricher` is **self-hosted by the customer in their own environment.** Nothing about this tool runs on a Tenable-owned or SE-owned server. The customer:
+ExposureIQ is **self-hosted by the customer in their own environment.** Nothing about this tool runs on a Tenable-owned or SE-owned server. The customer:
 
 - Clones the repo into their environment
 - Configures their Tenable One API credentials
@@ -49,8 +49,8 @@ Runs daily by default. On-demand pulls via `make pull`.
 
 ### 1. Clone and configure
 
-    git clone https://github.com/nreynolds-pub-git/t1-cve-enricher.git
-    cd t1-cve-enricher
+    git clone https://github.com/nreynolds-pub-git/exposureiq.git
+    cd ExposureIQ
     cp .env.example .env
 
 Edit `.env` and fill in your Tenable API credentials (other values have sensible defaults).
@@ -84,7 +84,7 @@ Each finding in the UI has an **Explain ✨** button. Clicking it opens a panel 
 
 ### Bring your own key
 
-Explanations require an API key from a supported LLM provider. **Your key lives in your browser's localStorage and is sent directly from your browser to the LLM provider.** The `t1-cve-enricher` backend never sees the key.
+Explanations require an API key from a supported LLM provider. **Your key lives in your browser's localStorage and is sent directly from your browser to the LLM provider.** The ExposureIQ backend never sees the key.
 
 Supported providers:
 

@@ -1,12 +1,12 @@
 # Single-container deployment. Backend serves both the API at /api/* and
 # the built frontend at /*. One port, one URL, one command.
 services:
-  t1-cve-enricher:
+  exposureiq:
     build:
       context: .
       dockerfile: Dockerfile
-    image: t1-cve-enricher:latest
-    container_name: t1-cve-enricher
+    image: exposureiq:latest
+    container_name: exposureiq
     ports:
       - "8000:8000"
     env_file:

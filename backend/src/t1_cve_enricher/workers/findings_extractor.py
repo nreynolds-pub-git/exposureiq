@@ -24,11 +24,11 @@ import structlog
 
 from t1_cve_enricher.config import Settings
 from t1_cve_enricher.db import get_connection
-from t1_cve_enricher.workers import progress
 from t1_cve_enricher.tenable.client import (
     INVENTORY_ASSETS_SEARCH,
     TenableClient,
 )
+from t1_cve_enricher.workers import progress
 
 logger = structlog.get_logger(__name__)
 
