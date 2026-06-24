@@ -17,7 +17,9 @@ from t1_cve_enricher.db import get_connection
 logger = structlog.get_logger(__name__)
 
 
-def begin(stage: str, total: int = 0, source: str | None = None, message: str | None = None) -> None:
+def begin(
+    stage: str, total: int = 0, source: str | None = None, message: str | None = None
+) -> None:
     """Mark the start of a stage. Resets counters."""
     now = datetime.now(UTC)
     try:

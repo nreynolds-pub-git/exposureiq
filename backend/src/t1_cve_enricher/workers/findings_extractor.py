@@ -96,7 +96,9 @@ def _join_arr(value: Any) -> str | None:
 async def run(settings: Settings, sources: list[str]) -> int:
     """Pull CVE findings for each source. Returns total findings persisted."""
     logger.info("findings_extractor: started", source_count=len(sources))
-    progress.begin("extraction", total=len(sources), message=f"Pulling findings from {len(sources)} sources")
+    progress.begin(
+        "extraction", total=len(sources), message=f"Pulling findings from {len(sources)} sources"
+    )
 
     # Each source pull happens in parallel; we tick the completion counter as
     # individual tasks finish so the UI sees real progress, not "0 -> done".

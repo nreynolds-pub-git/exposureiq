@@ -118,7 +118,11 @@ async def run(settings: Settings) -> int:
         logger.info("plugin_enricher: nothing to do")
         return 0
 
-    progress.begin("plugin_enrichment", total=len(cve_ids), message=f"Looking up plugins for {len(cve_ids)} CVEs")
+    progress.begin(
+        "plugin_enrichment",
+        total=len(cve_ids),
+        message=f"Looking up plugins for {len(cve_ids)} CVEs",
+    )
     total_plugins = 0
     total_links = 0
     failed_cves: list[str] = []

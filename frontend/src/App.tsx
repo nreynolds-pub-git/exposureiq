@@ -59,11 +59,11 @@ export default function App() {
       {/* Header */}
       <header className="border-b border-tenable-black/10 dark:border-white/10 bg-white dark:bg-tenable-black px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-1.5">
-            <div className="font-semibold tracking-tight rounded-md bg-tenable-black px-2.5 py-1 text-white self-start">
+          <div className="flex flex-col items-start gap-1.5 -ml-2.5">
+            <div className="font-semibold tracking-tight rounded-md bg-tenable-black px-2.5 py-1 text-white">
               Exposure<span className="text-tenable-yellow">IQ</span> for Tenable One
             </div>
-            <div className="text-xs uppercase tracking-widest text-tenable-black/60 dark:text-white/50 pl-0.5">
+            <div className="text-xs uppercase tracking-widest text-tenable-black/60 dark:text-white/50 pl-2.5">
               Control over chaos
             </div>
           </div>
