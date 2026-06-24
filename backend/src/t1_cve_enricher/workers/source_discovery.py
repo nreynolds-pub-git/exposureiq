@@ -16,6 +16,7 @@ import structlog
 from t1_cve_enricher.config import Settings
 from t1_cve_enricher.db import get_connection
 from t1_cve_enricher.tenable.client import TenableClient
+from t1_cve_enricher.workers import progress
 
 logger = structlog.get_logger(__name__)
 
@@ -23,6 +24,7 @@ logger = structlog.get_logger(__name__)
 async def run(settings: Settings) -> list[str]:
     """Discover third-party sources in Tenable One. Returns the list of names."""
     logger.info("source_discovery: started")
+    progress.begin("discovery", message="Discovering third-party data sources")
     async with TenableClient(settings) as client:
         sources = await client.list_sources()
 
@@ -46,5 +48,6 @@ async def run(settings: Settings) -> list[str]:
             )
             names.append(name)
 
+    progress.tick(1, total=1, message=f"Discovered {len(names)} sources")
     logger.info("source_discovery: finished", count=len(names))
     return names

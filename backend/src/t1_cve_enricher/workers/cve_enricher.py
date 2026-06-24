@@ -14,6 +14,7 @@ import structlog
 from t1_cve_enricher.config import Settings
 from t1_cve_enricher.db import get_connection
 from t1_cve_enricher.tenable.cve_scraper import CveIntel, CveScraper
+from t1_cve_enricher.workers import progress
 
 logger = structlog.get_logger(__name__)
 
@@ -88,14 +89,19 @@ async def run(settings: Settings) -> int:
     """Enrich all stale or missing CVEs. Returns the count enriched."""
     cves = _find_cves_needing_enrichment(settings)
     logger.info("cve_enricher: started", count=len(cves))
+    progress.begin("cve_enrichment", total=len(cves), message=f"Enriching {len(cves)} CVEs")
 
     enriched = 0
     async with CveScraper(settings) as scraper:
-        for cve_id in cves:
+        for i, cve_id in enumerate(cves, 1):
             intel = await scraper.fetch_one(cve_id)
             _persist(settings, intel)
             if intel.fetch_status == "OK":
                 enriched += 1
+            # Tick every 25 to keep DB write pressure low — at the 2 req/s
+            # scraper rate that's a progress write every ~12 seconds.
+            if i % 25 == 0 or i == len(cves):
+                progress.tick(i, message=f"Enriched {cve_id}")
 
     logger.info("cve_enricher: finished", enriched=enriched, total=len(cves))
     return enriched

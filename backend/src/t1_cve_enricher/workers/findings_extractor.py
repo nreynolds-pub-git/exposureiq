@@ -24,6 +24,7 @@ import structlog
 
 from t1_cve_enricher.config import Settings
 from t1_cve_enricher.db import get_connection
+from t1_cve_enricher.workers import progress
 from t1_cve_enricher.tenable.client import (
     INVENTORY_ASSETS_SEARCH,
     TenableClient,
@@ -95,7 +96,26 @@ def _join_arr(value: Any) -> str | None:
 async def run(settings: Settings, sources: list[str]) -> int:
     """Pull CVE findings for each source. Returns total findings persisted."""
     logger.info("findings_extractor: started", source_count=len(sources))
-    tasks = [_pull_one_source(settings, src) for src in sources]
+    progress.begin("extraction", total=len(sources), message=f"Pulling findings from {len(sources)} sources")
+
+    # Each source pull happens in parallel; we tick the completion counter as
+    # individual tasks finish so the UI sees real progress, not "0 -> done".
+    completed = 0
+    lock = asyncio.Lock()
+
+    async def _tracked(src: str) -> int:
+        nonlocal completed
+        try:
+            return await _pull_one_source(settings, src)
+        finally:
+            async with lock:
+                completed += 1
+                progress.tick(
+                    completed,
+                    message=f"Processed {completed}/{len(sources)} sources (just finished {src})",
+                )
+
+    tasks = [_tracked(src) for src in sources]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     total = 0

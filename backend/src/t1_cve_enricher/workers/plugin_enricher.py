@@ -36,6 +36,7 @@ import structlog
 from t1_cve_enricher.config import Settings
 from t1_cve_enricher.db import get_connection
 from t1_cve_enricher.tenable.plugins_client import PluginsClient
+from t1_cve_enricher.workers import progress
 
 logger = structlog.get_logger(__name__)
 
@@ -117,6 +118,7 @@ async def run(settings: Settings) -> int:
         logger.info("plugin_enricher: nothing to do")
         return 0
 
+    progress.begin("plugin_enrichment", total=len(cve_ids), message=f"Looking up plugins for {len(cve_ids)} CVEs")
     total_plugins = 0
     total_links = 0
     failed_cves: list[str] = []
@@ -202,7 +204,9 @@ async def run(settings: Settings) -> int:
                     )
                     total_links += 1
 
-            # Periodic progress logging so a 100-min run isn't silent.
+            # Tick UI progress every 25 CVEs; log every 100 (less spammy).
+            if i % 25 == 0 or i == len(cve_ids):
+                progress.tick(i, message=f"Plugin lookup: {cve_id}")
             if i % 100 == 0:
                 logger.info(
                     "plugin_enricher: progress",

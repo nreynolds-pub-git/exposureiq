@@ -20,6 +20,7 @@ from t1_cve_enricher.workers import (
     cve_enricher,
     findings_extractor,
     plugin_enricher,
+    progress,
     source_discovery,
 )
 
@@ -77,6 +78,7 @@ async def run_pipeline(settings: Settings | None = None) -> None:
                     job_id,
                 ),
             )
+        progress.finish(message=f"Last run: {status} at {datetime.now(UTC).isoformat()}")
 
 
 def start_scheduler(settings: Settings) -> None:

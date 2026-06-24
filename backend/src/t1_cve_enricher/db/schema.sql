@@ -125,3 +125,23 @@ CREATE TABLE IF NOT EXISTS cve_plugins (
 
 CREATE INDEX IF NOT EXISTS idx_cve_plugins_cve ON cve_plugins(cve_id);
 CREATE INDEX IF NOT EXISTS idx_cve_plugins_plugin ON cve_plugins(plugin_id);
+
+-- =============================================================================
+-- Live pipeline progress (single-row table)
+-- The CHECK(id=1) constraint enforces "at most one row" so workers can do
+-- simple UPDATE WHERE id=1 without managing row lifecycle. The /api/progress
+-- endpoint reads this row; the UI polls every ~2s while is_running=1.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS pipeline_progress (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    is_running INTEGER NOT NULL DEFAULT 0,
+    stage TEXT NOT NULL DEFAULT 'idle',
+    source TEXT,
+    current_n INTEGER NOT NULL DEFAULT 0,
+    total_n INTEGER NOT NULL DEFAULT 0,
+    message TEXT,
+    started_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+INSERT OR IGNORE INTO pipeline_progress (id, stage) VALUES (1, 'idle');

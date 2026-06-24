@@ -8,6 +8,7 @@ import { FindingsTable } from './components/FindingsTable';
 import { ExportButtons } from './components/ExportButtons';
 import { ThemeToggle } from './components/ThemeToggle';
 import { SettingsPanel } from './components/SettingsPanel';
+import { PipelineStatusBar } from './components/PipelineStatusBar';
 import { ExplainModal } from './components/ExplainModal';
 import type { ExplainContext } from './lib/llm';
 
@@ -54,6 +55,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <PipelineStatusBar />
       {/* Header */}
       <header className="border-b border-tenable-black/10 dark:border-white/10 bg-white dark:bg-tenable-black px-6 py-4">
         <div className="flex items-center justify-between">

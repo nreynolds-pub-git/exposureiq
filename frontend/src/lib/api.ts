@@ -1,6 +1,7 @@
 import type {
   EnrichedFinding,
   FilterState,
+  PipelineProgress,
   PullJob,
   SeverityCounts,
   Source,
@@ -44,6 +45,10 @@ export const api = {
   async stats(filters: FilterState): Promise<SeverityCounts> {
     const q = buildQuery(filters);
     return jsonOrThrow(await fetch(`${BASE}/stats?${q}`));
+  },
+
+  async getProgress(): Promise<PipelineProgress> {
+    return jsonOrThrow(await fetch(`${BASE}/progress`));
   },
 
   async refresh(): Promise<{ status: string }> {

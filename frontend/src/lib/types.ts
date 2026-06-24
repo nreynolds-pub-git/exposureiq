@@ -63,3 +63,14 @@ export interface PullJob {
   cves_enriched: number;
   error_message: string | null;
 }
+
+export interface PipelineProgress {
+  is_running: boolean;
+  stage: string;
+  source?: string | null;
+  current_n: number;
+  total_n: number;
+  message?: string | null;
+  started_at?: string | null;
+  updated_at?: string | null;
+}

@@ -33,6 +33,17 @@ router = APIRouter()
 # --- Models -------------------------------------------------------------------
 
 
+class PipelineProgress(BaseModel):
+    is_running: bool
+    stage: str
+    source: str | None = None
+    current_n: int
+    total_n: int
+    message: str | None = None
+    started_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class Source(BaseModel):
     name: str
     display_name: str | None = None
@@ -215,6 +226,35 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@router.get("/progress", response_model=PipelineProgress)
+def get_progress() -> Any:
+    """Current pipeline progress snapshot. Returns the single-row state."""
+    settings = get_settings()
+    with get_connection(settings.database_path) as conn:
+        row = conn.execute(
+            """SELECT is_running, stage, source, current_n, total_n,
+                      message, started_at, updated_at
+               FROM pipeline_progress WHERE id = 1"""
+        ).fetchone()
+        if row is None:
+            return {
+                "is_running": False,
+                "stage": "idle",
+                "current_n": 0,
+                "total_n": 0,
+            }
+        return {
+            "is_running": bool(row["is_running"]),
+            "stage": row["stage"],
+            "source": row["source"],
+            "current_n": row["current_n"],
+            "total_n": row["total_n"],
+            "message": row["message"],
+            "started_at": row["started_at"],
+            "updated_at": row["updated_at"],
+        }
+
+
 @router.get("/sources", response_model=list[Source])
 def list_sources() -> Any:  # -> list[Source] triggers FastAPI 0.137 dual-annotation bug
     settings = get_settings()
@@ -333,8 +373,15 @@ def severity_stats(
 
 @router.post("/refresh")
 async def trigger_refresh(background_tasks: BackgroundTasks) -> dict[str, str]:
-    """Fire off a pipeline run in the background."""
-    background_tasks.add_task(asyncio.create_task, run_pipeline())
+    """Fire off a pipeline run in the background.
+
+    FastAPI's BackgroundTasks awaits async callables natively — we pass the
+    function reference (not a coroutine) and let the framework schedule it
+    after the response. The earlier wrapper through asyncio.create_task was
+    a bug: it called run_pipeline() eagerly, producing a coroutine that was
+    then garbage-collected without being awaited.
+    """
+    background_tasks.add_task(run_pipeline)
     return {"status": "started"}
 
 
