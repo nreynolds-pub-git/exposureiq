@@ -70,7 +70,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
         <p className="mb-5 text-xs text-tenable-black/70 dark:text-white/70 leading-relaxed">
           To enable AI explanations, configure an API key from your preferred provider.
-          Your key stays in this browser and is never sent to the t1-cve-enricher backend.
+          Your key stays in this browser and is never sent to the ExposureIQ backend.
           When you click <span className="font-medium">Explain</span>, the finding's context
           is sent directly from your browser to the chosen provider.
         </p>

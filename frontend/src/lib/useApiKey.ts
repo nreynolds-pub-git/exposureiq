@@ -9,7 +9,7 @@ const PROVIDER_STORAGE = 'llm.provider';
  * Manages the user's LLM provider choice and API key. Both live in
  * localStorage and never leave the browser — when "Explain" is clicked,
  * the request goes directly from the browser to api.anthropic.com or
- * generativelanguage.googleapis.com. The t1-cve-enricher backend never
+ * generativelanguage.googleapis.com. The ExposureIQ backend never
  * sees the key.
  */
 export function useApiKey() {

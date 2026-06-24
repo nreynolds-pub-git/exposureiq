@@ -1,6 +1,6 @@
 # Architecture
 
-This document explains how `t1-cve-enricher` is put together, why it's shaped this way, and where the seams are if you want to extend it.
+This document explains how ExposureIQ is put together, why it's shaped this way, and where the seams are if you want to extend it.
 
 ## Mental model
 
@@ -52,7 +52,7 @@ Stores parsed fields plus the raw HTML in `cve_intel` (raw HTML for audit / re-p
 
 **Politeness.**
 
-- Identifying `User-Agent` (`t1-cve-enricher/0.1 (+github.com/nreynolds-pub-git/t1-cve-enricher)`)
+- Identifying `User-Agent` (`exposureiq/0.1 (+github.com/nreynolds-pub-git/exposureiq)`)
 - Rate-limited (configurable, default 2 req/s)
 - Honors `Retry-After`
 - Fails soft: a CVE that fails to enrich still appears in the UI, flagged

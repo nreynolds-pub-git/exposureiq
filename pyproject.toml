@@ -51,9 +51,9 @@ dev = [
 exposureiq = "t1_cve_enricher.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/nreynolds-pub-git/t1-cve-enricher"
-Repository = "https://github.com/nreynolds-pub-git/t1-cve-enricher"
-Issues = "https://github.com/nreynolds-pub-git/t1-cve-enricher/issues"
+Homepage = "https://github.com/nreynolds-pub-git/exposureiq"
+Repository = "https://github.com/nreynolds-pub-git/exposureiq"
+Issues = "https://github.com/nreynolds-pub-git/exposureiq/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/src/t1_cve_enricher"]

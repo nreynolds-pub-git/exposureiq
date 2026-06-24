@@ -174,7 +174,7 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
  * Throws on network errors, bad API keys, rate limits, or malformed responses.
  *
  * This function runs entirely in the browser — the API key is never sent
- * to the t1-cve-enricher backend. Requests go directly from the user's
+ * to the ExposureIQ backend. Requests go directly from the user's
  * browser to api.anthropic.com or generativelanguage.googleapis.com.
  */
 const CACHE_PREFIX = 'llm.explain.cache.v1.';
