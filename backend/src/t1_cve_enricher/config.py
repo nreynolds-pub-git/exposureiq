@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     schedule_cron: str = Field(default="0 2 * * *")
 
     # Server
-    host: str = Field(default="0.0.0.0")  # noqa: S104  # binding all interfaces is intentional
+    host: str = Field(default="0.0.0.0")  # binding all interfaces is intentional
     port: int = Field(default=8000, gt=0, lt=65536)
     cors_origins: str = Field(default="http://localhost:5173")
 

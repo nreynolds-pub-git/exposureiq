@@ -9,7 +9,7 @@ Runs once per pipeline execution.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 
@@ -26,11 +26,11 @@ async def run(settings: Settings) -> list[str]:
     async with TenableClient(settings) as client:
         sources = await client.list_sources()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     names: list[str] = []
     with get_connection(settings.database_path) as conn:
         for src in sources:
-            name = src["value"]                 # API filter identifier (e.g. RED-HAT:VM)
+            name = src["value"]  # API filter identifier (e.g. RED-HAT:VM)
             display_name = src.get("name", "")  # human-readable (e.g. "Red Hat Insights")
             asset_count = src.get("asset_count", 0)
             conn.execute(

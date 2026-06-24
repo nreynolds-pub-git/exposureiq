@@ -96,3 +96,6 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# TypeScript incremental build cache
+frontend/tsconfig.tsbuildinfo

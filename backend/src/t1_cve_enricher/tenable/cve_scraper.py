@@ -27,7 +27,7 @@ import os
 import re
 import ssl
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import structlog
@@ -88,7 +88,7 @@ class CveScraper:
             follow_redirects=True,
         )
 
-    async def __aenter__(self) -> "CveScraper":
+    async def __aenter__(self) -> CveScraper:
         return self
 
     async def __aexit__(self, *args: object) -> None:
@@ -127,14 +127,14 @@ class CveScraper:
             logger.warning("cve fetch failed", cve_id=cve_id, error=str(exc))
             return CveIntel(
                 cve_id=cve_id,
-                fetched_at=datetime.now(timezone.utc),
+                fetched_at=datetime.now(UTC),
                 fetch_status="ERROR",
             )
 
         if response.status_code == 404:
             return CveIntel(
                 cve_id=cve_id,
-                fetched_at=datetime.now(timezone.utc),
+                fetched_at=datetime.now(UTC),
                 fetch_status="NOT_FOUND",
             )
 
@@ -168,19 +168,19 @@ class CveScraper:
         intel = CveIntel(
             cve_id=cve_id,
             raw_html=html,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             fetch_status="OK",
         )
 
         soup = BeautifulSoup(html, "lxml")
         node = soup.find("script", id="__NEXT_DATA__")
-        if node is None or not node.string:
+        if node is None or not node.string:  # type: ignore[union-attr]  # bs4 Tag|NavigableString narrowing
             logger.warning("cve page has no __NEXT_DATA__ blob", cve_id=cve_id)
             intel.fetch_status = "ERROR"
             return intel
 
         try:
-            blob = json.loads(node.string)
+            blob = json.loads(node.string)  # type: ignore[union-attr]  # bs4 Tag|NavigableString narrowing
             page_props = blob.get("props", {}).get("pageProps", {})
             # A rejected CVE has deprecated=True but is still populated, so
             # only treat explicit errorStatus as a real not-found signal.
@@ -218,7 +218,7 @@ def _safe_float(v: object) -> float | None:
     if v is None:
         return None
     try:
-        return float(v)
+        return float(v)  # type: ignore[arg-type]  # TODO: tighten type of v in caller
     except (TypeError, ValueError):
         return None
 

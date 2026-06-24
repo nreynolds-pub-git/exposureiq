@@ -146,5 +146,9 @@ function severityActiveClass(sev: Severity): string {
       return 'bg-sev-medium text-tenable-black';
     case 'LOW':
       return 'bg-sev-low text-tenable-black';
+    default:
+      // INFO et al. are in the Severity type but not shown in this UI.
+      // Return a neutral style if they ever sneak in.
+      return 'bg-tenable-black/20 text-tenable-black dark:bg-white/20 dark:text-white';
   }
 }

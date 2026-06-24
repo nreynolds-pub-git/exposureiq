@@ -108,9 +108,7 @@ def _build_findings_query(
         where.append(f"f.cve_id IN ({','.join('?' * len(cves))})")
         params.extend(c.upper() for c in cves)
     if asset:
-        where.append(
-            "(a.asset_name LIKE ? OR a.fqdn LIKE ? OR a.ipv4 LIKE ?)"
-        )
+        where.append("(a.asset_name LIKE ? OR a.fqdn LIKE ? OR a.ipv4 LIKE ?)")
         like = f"%{asset}%"
         params.extend([like, like, like])
     if severities:
@@ -124,9 +122,7 @@ def _build_findings_query(
     elif enriched is False:
         where.append("(c.cve_id IS NULL OR c.fetch_status != 'OK')")
     if hide_no_plugins:
-        where.append(
-            "EXISTS (SELECT 1 FROM cve_plugins cp WHERE cp.cve_id = f.cve_id)"
-        )
+        where.append("EXISTS (SELECT 1 FROM cve_plugins cp WHERE cp.cve_id = f.cve_id)")
 
     sql = """
         SELECT
@@ -220,7 +216,7 @@ def health() -> dict[str, str]:
 
 
 @router.get("/sources", response_model=list[Source])
-def list_sources():
+def list_sources() -> Any:  # -> list[Source] triggers FastAPI 0.137 dual-annotation bug
     settings = get_settings()
     with get_connection(settings.database_path) as conn:
         rows = conn.execute("SELECT * FROM sources ORDER BY name").fetchall()
@@ -228,7 +224,7 @@ def list_sources():
 
 
 @router.get("/findings", response_model=list[EnrichedFinding])
-def list_findings(
+def list_findings(  # type: ignore[no-untyped-def]  # see list_sources note
     source: list[str] | None = Query(default=None),
     cve: list[str] | None = Query(default=None),
     asset: str | None = None,
@@ -241,7 +237,9 @@ def list_findings(
     offset: int = Query(default=0, ge=0),
 ):
     settings = get_settings()
-    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
+    sql, params = _build_findings_query(
+        source, cve, asset, severity, state, enriched, hide_no_plugins
+    )
     sql += _build_order_by(sort) + " LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     results: list[EnrichedFinding] = []
@@ -279,7 +277,9 @@ def export_findings(
     format: str = Query(default="csv", pattern="^(csv|json)$"),
 ) -> Any:
     settings = get_settings()
-    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
+    sql, params = _build_findings_query(
+        source, cve, asset, severity, state, enriched, hide_no_plugins
+    )
     sql += _build_order_by(sort)
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
@@ -293,9 +293,7 @@ def export_findings(
 def get_cve(cve_id: str) -> dict[str, Any]:
     settings = get_settings()
     with get_connection(settings.database_path) as conn:
-        row = conn.execute(
-            "SELECT * FROM cve_intel WHERE cve_id = ?", (cve_id.upper(),)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM cve_intel WHERE cve_id = ?", (cve_id.upper(),)).fetchone()
     return dict(row) if row else {"cve_id": cve_id.upper(), "fetch_status": "MISSING"}
 
 
@@ -310,7 +308,9 @@ def severity_stats(
     hide_no_plugins: bool = Query(default=True),
 ) -> SeverityCounts:
     settings = get_settings()
-    sql, params = _build_findings_query(source, cve, asset, severity, state, enriched, hide_no_plugins)
+    sql, params = _build_findings_query(
+        source, cve, asset, severity, state, enriched, hide_no_plugins
+    )
     counts = SeverityCounts()
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
@@ -339,7 +339,7 @@ async def trigger_refresh(background_tasks: BackgroundTasks) -> dict[str, str]:
 
 
 @router.get("/jobs", response_model=list[PullJob])
-def list_jobs(limit: int = Query(default=20, ge=1, le=200)):
+def list_jobs(limit: int = Query(default=20, ge=1, le=200)) -> Any:  # see list_sources note
     settings = get_settings()
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(

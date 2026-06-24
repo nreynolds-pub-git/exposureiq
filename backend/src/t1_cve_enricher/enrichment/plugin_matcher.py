@@ -33,11 +33,11 @@ from typing import Any
 SOURCE_TO_PLATFORM: dict[str, str] = {
     "RED-HAT:VM": "redhat",
     "MICROSOFT:TVM": "windows",
-    "SENTINEL-ONE:EDR": "multi",       # endpoints could be any OS
-    "MASTERCARD:DAST": "web",           # external attack surface = web apps
-    "AWS:AINV": "multi",                # EC2 inventory spans OSes
-    "SERVICE-NOW:AINV": "unknown",      # CMDB items vary too widely
-    "SNYK:SNYK": "code",                # SCA / code-level findings
+    "SENTINEL-ONE:EDR": "multi",  # endpoints could be any OS
+    "MASTERCARD:DAST": "web",  # external attack surface = web apps
+    "AWS:AINV": "multi",  # EC2 inventory spans OSes
+    "SERVICE-NOW:AINV": "unknown",  # CMDB items vary too widely
+    "SNYK:SNYK": "code",  # SCA / code-level findings
 }
 
 # --- Platform -> preferred family regex patterns ----------------------------
@@ -51,10 +51,10 @@ _PLATFORM_FAMILY_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "redhat": [
         re.compile(r"^Red Hat Local Security Checks$"),
         re.compile(r"^Oracle Linux Local Security Checks$"),  # binary-compat
-        re.compile(r"^CentOS Local Security Checks$"),         # binary-compat
+        re.compile(r"^CentOS Local Security Checks$"),  # binary-compat
     ],
     "windows": [
-        re.compile(r"^Windows"),                  # "Windows", "Windows : Microsoft Bulletins"
+        re.compile(r"^Windows"),  # "Windows", "Windows : Microsoft Bulletins"
         re.compile(r"^Microsoft Bulletins$"),
     ],
     "web": [
@@ -64,8 +64,8 @@ _PLATFORM_FAMILY_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "code": [
         re.compile(r"^Snyk", re.IGNORECASE),
     ],
-    "multi": [],      # no preference; fall back to highest VPR overall
-    "unknown": [],    # same
+    "multi": [],  # no preference; fall back to highest VPR overall
+    "unknown": [],  # same
 }
 
 

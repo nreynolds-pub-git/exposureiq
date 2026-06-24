@@ -101,7 +101,7 @@ class PluginsClient:
         url = f"{PLUGINS_BASE}/search"
         logger.debug("plugins search", cve_id=cve_id, max_results=max_results)
 
-        response = await self._client.get(url, params=params)
+        response = await self._client.get(url, params=params)  # type: ignore[arg-type]  # TODO: type params as dict[str, str|int]
         response.raise_for_status()
         payload = response.json()
 

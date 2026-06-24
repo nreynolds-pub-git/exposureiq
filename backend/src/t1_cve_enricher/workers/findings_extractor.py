@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -48,9 +48,7 @@ def _extract_cve_id(finding: dict[str, Any]) -> str | None:
     return None
 
 
-async def _pull_assets_for_source(
-    client: TenableClient, source: str
-) -> dict[str, dict[str, Any]]:
+async def _pull_assets_for_source(client: TenableClient, source: str) -> dict[str, dict[str, Any]]:
     """Return assets keyed by asset_id for a given source."""
     assets: dict[str, dict[str, Any]] = {}
     offset = 0
@@ -105,7 +103,7 @@ async def run(settings: Settings, sources: list[str]) -> int:
         if isinstance(result, Exception):
             logger.error("source failed", source=src, error=str(result))
             continue
-        total += result
+        total += result  # type: ignore[operator]  # narrowed by isinstance check above
 
     logger.info("findings_extractor: finished", total=total)
     return total
@@ -137,7 +135,7 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
         cve_findings=len(cve_findings),
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     persisted = 0
     with get_connection(settings.database_path) as conn:
         # Upsert assets first
@@ -168,9 +166,10 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
         # Then findings. If a finding references an asset we don't have in our
         # local store, skip it — the foreign key would fail anyway.
         for f in cve_findings:
-            asset_id = f.get("asset_id")
-            if not asset_id or asset_id not in assets:
+            asset_id_raw = f.get("asset_id")
+            if not asset_id_raw or asset_id_raw not in assets:
                 continue
+            finding_asset_id: str = str(asset_id_raw)
             conn.execute(
                 """
                 INSERT INTO findings (finding_id, asset_id, cve_id, severity, state,
@@ -184,7 +183,7 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
                 """,
                 (
                     f.get("finding_id") or f.get("id"),
-                    asset_id,
+                    finding_asset_id,
                     f["_cve_id"],
                     f.get("finding_severity") or f.get("severity"),
                     f.get("state"),

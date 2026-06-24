@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApiKey, type LlmProvider } from '../lib/useApiKey';
 import { clearExplanationCache, getCacheSize } from '../lib/llm';
 
@@ -24,8 +24,13 @@ export function SettingsPanel({ open, onClose }: Props) {
   const { apiKey, setApiKey, provider, setProvider } = useApiKey();
   const [draftKey, setDraftKey] = useState(apiKey);
   const [draftProvider, setDraftProvider] = useState<LlmProvider>(provider);
-  const [cacheVersion, setCacheVersion] = useState(0);
-  const cacheSize = useMemo(() => getCacheSize(), [open, cacheVersion]);
+  const [cacheSize, setCacheSize] = useState(0);
+
+  // Re-count cached explanations whenever the modal opens or after a clear,
+  // so the count badge stays accurate without polling localStorage every render.
+  useEffect(() => {
+    if (open) setCacheSize(getCacheSize());
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -49,7 +54,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
   const handleClearCache = () => {
     clearExplanationCache();
-    setCacheVersion((v) => v + 1);
+    setCacheSize(0);
   };
 
   return (

@@ -94,7 +94,7 @@ export default function App() {
           </div>
         </div>
         <div className="mt-6">
-          <SeverityChart counts={stats.data} loading={stats.isLoading} />
+          <SeverityChart counts={stats.data} />
         </div>
       </header>
 
@@ -102,6 +102,7 @@ export default function App() {
       <div className="border-b border-tenable-black/10 dark:border-white/10 bg-white/50 dark:bg-tenable-black/50 px-6 py-3">
         <FilterBar
           sources={sources.data ?? []}
+          stats={stats.data}
           filters={filters}
           onChange={setFilters}
         />

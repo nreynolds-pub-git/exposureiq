@@ -101,7 +101,7 @@ class TenableClient:
             verify=_build_ssl_context(),
         )
 
-    async def __aenter__(self) -> "TenableClient":
+    async def __aenter__(self) -> TenableClient:
         return self
 
     async def __aexit__(self, *args: object) -> None:
@@ -265,7 +265,9 @@ class TenableClient:
         logger.info("export complete", export_id=export_id, total_records=len(all_records))
         return all_records
 
-    async def list_asset_ids_for_source(self, source_value: str, max_assets: int = 50000) -> list[str]:
+    async def list_asset_ids_for_source(
+        self, source_value: str, max_assets: int = 50000
+    ) -> list[str]:
         """Return the asset_ids for a given source. Paginates internally.
 
         `source_value` is the `products` enum value (e.g. 'SENTINEL-ONE:EDR'),
@@ -313,9 +315,12 @@ class TenableClient:
             data = await self._request("GET", path)
             status = (data or {}).get("status", "").upper()
             if status in ("FINISHED", "COMPLETED", "DONE"):
-                chunks = data.get("chunks_available") or data.get("chunks") or data.get(
-                    "available_chunks"
-                ) or []
+                chunks = (
+                    data.get("chunks_available")
+                    or data.get("chunks")
+                    or data.get("available_chunks")
+                    or []
+                )
                 return [int(c) for c in chunks]
             if status in ("FAILED", "ERROR", "CANCELLED"):
                 raise TenableApiError(f"Export {export_id} failed with status {status}")
@@ -368,7 +373,7 @@ async def _cli_smoke_test() -> None:
         asset_ids = await client.list_asset_ids_for_source(smallest["value"])
         print(f"  ✓ {len(asset_ids)} asset IDs")
 
-        print(f"\nExporting findings for those assets…")
+        print("\nExporting findings for those assets…")
         records = await client.export_findings(asset_ids)
         print(f"  ✓ pulled {len(records)} finding records")
         if records:

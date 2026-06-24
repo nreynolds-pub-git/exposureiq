@@ -27,9 +27,8 @@ Design points:
 
 from __future__ import annotations
 
-import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -72,6 +71,7 @@ def _extract_plugin_row(src: dict[str, Any]) -> dict[str, Any]:
     search response (cpe, see_also, exploit_available, scalar CVSS
     scores) are left as None — recoverable from raw_json later.
     """
+
     def _as_float(v: Any) -> float | None:
         if v is None or v == "":
             return None
@@ -120,13 +120,13 @@ async def run(settings: Settings) -> int:
     total_plugins = 0
     total_links = 0
     failed_cves: list[str] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     async with PluginsClient(settings) as client:
         for i, cve_id in enumerate(cve_ids, 1):
             try:
                 hits = await client.search_by_cve(cve_id)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("plugin search failed", cve_id=cve_id, error=str(exc))
                 failed_cves.append(cve_id)
                 with get_connection(settings.database_path) as conn:
@@ -219,6 +219,8 @@ async def run(settings: Settings) -> int:
         failed=len(failed_cves),
     )
     if failed_cves:
-        logger.warning("plugin_enricher: failed cves", count=len(failed_cves), sample=failed_cves[:5])
+        logger.warning(
+            "plugin_enricher: failed cves", count=len(failed_cves), sample=failed_cves[:5]
+        )
 
     return total_plugins

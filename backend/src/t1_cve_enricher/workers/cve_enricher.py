@@ -7,7 +7,7 @@ fetches the Tenable CVE page and stores the parsed intel in `cve_intel`.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import structlog
 
@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 def _find_cves_needing_enrichment(settings: Settings) -> list[str]:
     """Return CVE IDs present in findings but missing or stale in cve_intel."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.cve_cache_ttl_days)
+    cutoff = datetime.now(UTC) - timedelta(days=settings.cve_cache_ttl_days)
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(
             """

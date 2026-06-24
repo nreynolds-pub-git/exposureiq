@@ -11,10 +11,9 @@ const SEVERITY_COLORS = {
 
 interface Props {
   counts: SeverityCounts | undefined;
-  loading: boolean;
 }
 
-export function SeverityChart({ counts, loading }: Props) {
+export function SeverityChart({ counts }: Props) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const data = counts
@@ -26,7 +25,6 @@ export function SeverityChart({ counts, loading }: Props) {
       ]
     : [];
 
-  const total = data.reduce((acc, d) => acc + d.count, 0);
 
   return (
     <div>

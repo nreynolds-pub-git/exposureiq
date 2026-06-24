@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,7 +16,12 @@ from apscheduler.triggers.cron import CronTrigger
 
 from t1_cve_enricher.config import Settings, get_settings
 from t1_cve_enricher.db import get_connection
-from t1_cve_enricher.workers import cve_enricher, findings_extractor, plugin_enricher, source_discovery
+from t1_cve_enricher.workers import (
+    cve_enricher,
+    findings_extractor,
+    plugin_enricher,
+    source_discovery,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -26,7 +31,7 @@ _scheduler: AsyncIOScheduler | None = None
 async def run_pipeline(settings: Settings | None = None) -> None:
     """Run all three stages in sequence."""
     settings = settings or get_settings()
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     job_id: int | None = None
 
     with get_connection(settings.database_path) as conn:
@@ -44,7 +49,7 @@ async def run_pipeline(settings: Settings | None = None) -> None:
         logger.info("pipeline: plugin enrichment done", plugin_count=plugin_count)
         status = "SUCCESS"
         error = None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("pipeline failed")
         sources, findings_count, enriched_count = [], 0, 0
         status = "FAILED"
@@ -63,7 +68,7 @@ async def run_pipeline(settings: Settings | None = None) -> None:
                 WHERE id = ?
                 """,
                 (
-                    datetime.now(timezone.utc),
+                    datetime.now(UTC),
                     status,
                     len(sources),
                     findings_count,
