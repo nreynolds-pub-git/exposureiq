@@ -1,4 +1,5 @@
 import type { EnrichedFinding, FilterState, Severity } from '../lib/types';
+import type { ExplainContext } from '../lib/llm';
 
 const SEVERITY_CLASSES: Record<Severity, string> = {
   CRITICAL: 'bg-sev-critical text-tenable-black',
@@ -13,6 +14,7 @@ interface Props {
   loading: boolean;
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
+  onExplain: (ctx: ExplainContext) => void;
 }
 
 type SortKey = 'asset' | 'vpr' | 'cvss3';
@@ -39,7 +41,7 @@ function SortIndicator({ active, direction }: { active: boolean; direction: stri
   );
 }
 
-export function FindingsTable({ findings, loading, filters, onFiltersChange }: Props) {
+export function FindingsTable({ findings, loading, filters, onFiltersChange, onExplain }: Props) {
   const [curKey, curDir] = (filters.sort || '').split(':');
   const handleSort = (key: SortKey) =>
     onFiltersChange({ ...filters, sort: nextSortValue(filters.sort, key) });
@@ -85,6 +87,7 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange }: P
             </th>
             <th className="px-3 py-2">Fix Source</th>
             <th className="px-3 py-2">Remediation</th>
+            <th className="px-3 py-2 w-24"></th>
           </tr>
         </thead>
         <tbody>
@@ -165,6 +168,28 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange }: P
                     <span className="line-clamp-2 text-tenable-black/80 dark:text-white/80">{f.remediation}</span>
                   );
                 })()}
+              </td>
+              <td className="px-3 py-2 text-right">
+                <button
+                  onClick={() =>
+                    onExplain({
+                      cve_id: f.cve_id,
+                      asset_name: f.asset_name ?? null,
+                      source: f.source,
+                      severity: f.severity ?? null,
+                      vpr_score: f.vpr_score ?? null,
+                      cvss3_base_score: f.cvss3_base_score ?? null,
+                      plugin_family: f.plugin_family ?? null,
+                      plugin_platform_match: f.plugin_platform_match ?? null,
+                      remediation: f.remediation ?? null,
+                      cve_description: f.cve_description ?? null,
+                    })
+                  }
+                  className="rounded-md border border-tenable-yellow/40 bg-tenable-yellow/10 px-2 py-1 text-xs text-tenable-black dark:text-tenable-yellow hover:bg-tenable-yellow/20 transition whitespace-nowrap"
+                  title="Explain this finding with AI"
+                >
+                  Explain ✨
+                </button>
               </td>
             </tr>
           ))}

@@ -7,6 +7,9 @@ import { FilterBar } from './components/FilterBar';
 import { FindingsTable } from './components/FindingsTable';
 import { ExportButtons } from './components/ExportButtons';
 import { ThemeToggle } from './components/ThemeToggle';
+import { SettingsPanel } from './components/SettingsPanel';
+import { ExplainModal } from './components/ExplainModal';
+import type { ExplainContext } from './lib/llm';
 
 const emptyFilters: FilterState = {
   sources: [],
@@ -24,6 +27,8 @@ const PAGE_SIZE = 500;
 export default function App() {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [page, setPage] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [explainCtx, setExplainCtx] = useState<ExplainContext | null>(null);
 
   // Reset to page 0 whenever filters change so users don't end up on
   // an out-of-range page after narrowing the result set.
@@ -65,6 +70,26 @@ export default function App() {
               Refresh data
             </button>
             <ExportButtons filters={filters} />
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="rounded-md border border-tenable-black/20 dark:border-white/20 bg-tenable-black/5 dark:bg-white/5 px-2 py-1.5 text-tenable-black/70 dark:text-white/70 hover:text-tenable-black dark:hover:text-white transition"
+              title="LLM provider settings"
+              aria-label="LLM provider settings"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
             <ThemeToggle />
           </div>
         </div>
@@ -89,6 +114,7 @@ export default function App() {
           loading={findings.isLoading}
           filters={filters}
           onFiltersChange={setFiltersResetPage}
+          onExplain={setExplainCtx}
         />
         {(() => {
           const totalFindings = stats.data
@@ -126,6 +152,16 @@ export default function App() {
           );
         })()}
       </main>
+
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ExplainModal
+        context={explainCtx}
+        onClose={() => setExplainCtx(null)}
+        onOpenSettings={() => {
+          setExplainCtx(null);
+          setSettingsOpen(true);
+        }}
+      />
 
       <footer className="border-t border-tenable-black/10 dark:border-white/10 px-6 py-3 text-xs text-tenable-black/50 dark:text-white/40">
         Showing {findings.data?.length ?? 0} findings · enrichment cached locally · CVE intel from
