@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install install-backend install-frontend run run-backend run-frontend \
+.PHONY: help install install-backend install-frontend init-db run run-backend run-frontend \
         pull smoke-test test test-backend test-frontend lint lint-backend lint-frontend \
         format format-backend format-frontend clean docker-up docker-down
 
@@ -20,6 +20,16 @@ install-backend:  ## Install Python backend dependencies
 
 install-frontend:  ## Install frontend dependencies
 	cd frontend && $(NPM) install
+
+init-db:  ## Create data/ dir and initialize the SQLite schema
+	@mkdir -p data
+	@if [ ! -f data/enricher.db ]; then \
+		echo "Creating data/enricher.db from schema.sql..."; \
+		sqlite3 data/enricher.db < backend/src/t1_cve_enricher/db/schema.sql; \
+		echo "Done. Now run 'make pull' to populate."; \
+	else \
+		echo "data/enricher.db already exists. Delete it first if you want a fresh database."; \
+	fi
 
 # --- Run ---
 
