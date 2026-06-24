@@ -1,0 +1,42 @@
+# Source-control + IDE
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Python build/cache
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.venv
+venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Node
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/tsconfig.tsbuildinfo
+
+# Local data — never bake a customer DB into the image
+data
+*.db
+*.sqlite*
+
+# Local config — never bake a customer's .env into the image
+.env
+.env.local
+
+# Docs not needed inside the image
+docs
+
+# Skill / cert / dev-only files
+*.pem

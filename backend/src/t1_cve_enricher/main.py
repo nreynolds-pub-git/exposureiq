@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path as _StaticPath
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from t1_cve_enricher import __version__
 from t1_cve_enricher.api.routes import router as api_router
@@ -72,6 +74,15 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router, prefix="/api")
+
+    # Serve the built frontend if it's been built into ./frontend/dist.
+    # In dev (running `make run-backend`), this directory doesn't exist
+    # and we silently skip — the Vite dev server on :5173 handles the UI.
+    # In the Docker image, it's baked in at build time.
+    dist_dir = _StaticPath(__file__).resolve().parents[3] / "frontend" / "dist"
+    if dist_dir.is_dir():
+        app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="frontend")
+
     return app
 
 

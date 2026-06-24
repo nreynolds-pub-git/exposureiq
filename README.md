@@ -183,7 +183,7 @@ This tool uses the public Tenable CVE pages at `https://www.tenable.com/cve/{CVE
 - [x] Multi-source pipeline (7 third-party sources)
 - [x] Dark/light mode, server-side sort, pagination
 - [x] AI explanations (Claude + Gemini, BYOK)
-- [ ] Containerized deployment (Dockerfile + docker-compose)
+- [x] Containerized deployment (Dockerfile + docker-compose)
 - [ ] Pipeline progress reporting (live status during long pulls)
 - [ ] Per-asset finding history
 - [ ] Trend deltas (new vs. resurfaced vs. fixed since last run)

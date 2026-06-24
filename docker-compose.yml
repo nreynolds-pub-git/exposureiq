@@ -1,33 +1,27 @@
+# Single-container deployment. Backend serves both the API at /api/* and
+# the built frontend at /*. One port, one URL, one command.
 services:
-  backend:
+  t1-cve-enricher:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    container_name: t1-cve-enricher-backend
+      dockerfile: Dockerfile
+    image: t1-cve-enricher:latest
+    container_name: t1-cve-enricher
     ports:
       - "8000:8000"
     env_file:
       - .env
+    # Pin CORS to the same origin the frontend is served from — since the
+    # backend serves both UI and API, there's no real cross-origin.
+    environment:
+      - CORS_ORIGINS=http://localhost:8000
     volumes:
+      # SQLite database lives outside the container so it survives rebuilds.
       - ./data:/app/data
-      # Mount a corporate cert bundle here if needed:
-      # - /path/to/corporate-ca-bundle.pem:/etc/ssl/certs/corporate-ca-bundle.pem:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: t1-cve-enricher-frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000
-    depends_on:
-      - backend
-    restart: unless-stopped
+      start_period: 10s
