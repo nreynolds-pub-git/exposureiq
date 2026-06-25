@@ -1,6 +1,6 @@
 # ExposureIQ for Tenable One
 
-> A self-hosted SE remediation accelerator: pulls CVE-shaped findings from third-party connectors in Tenable One, joins them with Tenable's public CVE intelligence, and surfaces them in a filterable web UI with on-demand AI explanations.
+> A self-hosted remediation accelerator: pulls CVE-shaped findings from third-party connectors in Tenable One, joins them with Tenable's public CVE intelligence, and surfaces them in a filterable web UI with on-demand AI explanations.
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com/)
@@ -39,10 +39,13 @@ Runs daily by default. On-demand pulls via `make pull`.
 
 ## Quick start
 
+The recommended way to run ExposureIQ is as a Docker container. It bundles
+the backend, the built frontend, and all dependencies into a single image
+that serves both the UI and the API on one port.
+
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 22+
+- Docker Desktop (Mac/Windows) or Docker Engine (Linux)
 - A Tenable One tenant with API credentials (Access Key + Secret Key)
 - A user account with permission to read inventory assets and findings
 - (Optional) An API key from Anthropic or Google AI Studio for the Explain feature
@@ -50,33 +53,65 @@ Runs daily by default. On-demand pulls via `make pull`.
 ### 1. Clone and configure
 
     git clone https://github.com/nreynolds-pub-git/exposureiq.git
-    cd ExposureIQ
+    cd exposureiq
     cp .env.example .env
 
-Edit `.env` and fill in your Tenable API credentials (other values have sensible defaults).
+Edit `.env` and fill in your Tenable API credentials. Other values have
+sensible defaults.
 
-### 2. Install and initialize
+### 2. Build and run
 
-    make install         # installs both backend and frontend deps
-    make init-db         # creates ./data/ and initializes the SQLite schema
+    docker compose up -d --build
 
-### 3. Run
+First build takes 2–3 minutes (downloads Node and Python base images, runs
+`npm ci` and `pip install`). Subsequent runs reuse the image and start in
+seconds.
+
+Open `http://localhost:8000` in your browser. Click **Run pipeline** in the
+top-right of the status bar to trigger the first data pull (5–15 minutes
+on a cold cache; faster after).
+
+The pipeline also runs automatically every 24 hours via the in-container
+scheduler. Change the schedule by setting `SCHEDULE_CRON` in `.env`.
+
+### Updating to a new version
+
+    git pull
+    docker compose up -d --build
+
+The SQLite database lives in a host-mounted `./data/` directory, so it
+survives container rebuilds and image updates.
+
+## Running without Docker (for contributors)
+
+If you're developing ExposureIQ rather than just running it, you can run
+the backend and frontend natively:
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 22+
+- Plus the Tenable credentials and optional LLM key as above
+
+### Steps
+
+    cp .env.example .env             # fill in Tenable credentials
+    make install                     # backend and frontend deps
+    make init-db                     # initialize ./data/enricher.db
 
 In two terminals:
 
     # Terminal 1: backend
-    make run-backend     # FastAPI on :8000
+    make run-backend                 # FastAPI on :8000
 
     # Terminal 2: frontend
-    make run-frontend    # Vite dev server on :5173
+    make run-frontend                # Vite dev server on :5173
 
-### 4. Populate the database
+The Vite dev server proxies API calls to the backend, so open
+`http://localhost:5173` (not :8000) to get hot module reload.
 
-    make pull            # runs the full pipeline once
-
-This takes 5–15 minutes on first run depending on how many CVEs need enrichment. Subsequent runs are much faster due to the 7-day CVE cache.
-
-Open `http://localhost:5173` and select a source from the filter dropdown.
+Trigger an on-demand pipeline run with `make pull`, or click **Run
+pipeline** in the UI.
 
 ## AI Explanations (Optional)
 
@@ -144,14 +179,6 @@ All backend configuration is via environment variables. Copy `.env.example` to `
 
 LLM API keys are **not** configured here — they are entered in the UI's Settings modal and stored in browser localStorage. The backend never reads or stores them.
 
-## Behind a corporate proxy or SSL-inspecting gateway
-
-If you're behind Netskope, Zscaler, or similar:
-
-    export REQUESTS_CA_BUNDLE=/path/to/combined-ca-bundle.pem
-    export SSL_CERT_FILE=/path/to/combined-ca-bundle.pem
-
-The HTTP clients respect both. For frontend installs via npm, also set `NODE_EXTRA_CA_CERTS` to the same path, or configure your npm registry mirror in `~/.npmrc`.
 
 ## Development
 
