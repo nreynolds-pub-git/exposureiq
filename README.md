@@ -1,3 +1,5 @@
+> ⚠️ This README describes the previous version. The tool is being reworked — see EXPOSUREIQ_PLAN.md for the current design.
+
 # ExposureIQ for Tenable One
 
 > A self-hosted remediation accelerator: pulls CVE-shaped findings from third-party connectors in Tenable One, joins them with Tenable's public CVE intelligence, and surfaces them in a filterable web UI with on-demand AI explanations.

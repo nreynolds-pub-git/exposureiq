@@ -114,8 +114,12 @@ class TenableClient:
 
     @retry(
         retry=retry_if_exception_type((httpx.HTTPError, TenableApiError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        # 429s from Tenable can take 30-60s to clear when many sources are
+        # pulled in parallel. Six attempts with exponential backoff capped at
+        # 60s gives us ~3 minutes of headroom per request, which the rate
+        # limiter forgives.
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=2, min=4, max=60),
         reraise=True,
     )
     async def _request(
@@ -136,6 +140,20 @@ class TenableClient:
             raise TenableApiError(
                 "Tenable API returned 403. The API user may lack inventory permissions."
             )
+        # 429: respect Retry-After if present, otherwise let tenacity's
+        # exponential backoff take over by raising. We sleep here to honor
+        # the server's suggested wait before tenacity also adds its own.
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                wait_s = min(int(retry_after), 60)
+                logger.warning(
+                    "tenable rate limited; honoring Retry-After",
+                    path=path,
+                    wait_s=wait_s,
+                )
+                await asyncio.sleep(wait_s)
+            response.raise_for_status()  # raises HTTPStatusError -> tenacity retries
         response.raise_for_status()
         if not response.content:
             return None

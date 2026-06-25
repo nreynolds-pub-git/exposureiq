@@ -38,7 +38,10 @@ async def sample_source(client: TenableClient, source: str) -> dict[str, Any] | 
         "limit": 1,
         "offset": 0,
     }
-    data = await client._request("POST", INVENTORY_ASSETS_SEARCH, json_body=body)
+    # Request the rich asset properties — mirrors what findings_extractor does
+    extra_props = "ipv4_addresses,fqdns,mac_addresses,first_observed_at,last_observed_at,device_system_type"
+    url = f"{INVENTORY_ASSETS_SEARCH}?extra_properties={extra_props}"
+    data = await client._request("POST", url, json_body=body)
     if not isinstance(data, dict):
         return None
     records = data.get("assets") or data.get("data") or data.get("records") or []
