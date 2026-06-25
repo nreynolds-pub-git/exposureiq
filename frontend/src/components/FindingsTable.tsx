@@ -121,9 +121,11 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange, onE
               </td>
               <td className="px-3 py-2">
                 <div>{f.asset_name ?? <em className="text-tenable-black/50 dark:text-white/40">—</em>}</div>
-                <div className="text-xs text-tenable-black/50 dark:text-white/40">
-                  {f.asset_fqdn || f.asset_ipv4 || ''}
-                </div>
+                {f.asset_ipv4 && (
+                  <div className="text-xs text-tenable-black/50 dark:text-white/40">
+                    {f.asset_ipv4}
+                  </div>
+                )}
               </td>
               <td className="px-3 py-2 text-tenable-black/80 dark:text-white/80">{f.source}</td>
               <td className="px-3 py-2">{f.vpr_score?.toFixed(1) ?? '—'}</td>
