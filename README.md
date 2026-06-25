@@ -16,7 +16,7 @@ Tenable One ingests findings from third-party security tools (EDR, CSPM, cloud, 
 
 ## How it's deployed
 
-ExposureIQ is **self-hosted by the customer in their own environment.** Nothing about this tool runs on a Tenable-owned or SE-owned server. The customer:
+ExposureIQ is **self-hosted by the customer in their own environment.** Nothing about this tool runs on a Tenable-owned server. The customer:
 
 - Clones the repo into their environment
 - Configures their Tenable One API credentials
