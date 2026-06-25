@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS assets (
     asset_class TEXT,
     ipv4 TEXT,
     fqdn TEXT,
+    operating_system TEXT,
     last_synced TIMESTAMP NOT NULL,
     FOREIGN KEY (source) REFERENCES sources(name)
 );

@@ -99,3 +99,6 @@ Thumbs.db
 
 # TypeScript incremental build cache
 frontend/tsconfig.tsbuildinfo
+# scripts/ diagnostic output (regenerated on demand, not source)
+scripts/source_shapes.json
+scripts/*.out

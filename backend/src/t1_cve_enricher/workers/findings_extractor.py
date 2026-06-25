@@ -60,7 +60,11 @@ async def _pull_assets_for_source(client: TenableClient, source: str) -> dict[st
             "limit": page_size,
             "offset": offset,
         }
-        data = await client._request("POST", INVENTORY_ASSETS_SEARCH, json_body=body)
+        # Request the rich asset properties we need. Without this, the response's
+        # extra_properties field is {}. See findings_extractor docstring.
+        extra_props = "ipv4_addresses,fqdns,first_observed_at,last_observed_at,device_system_type"
+        url = f"{INVENTORY_ASSETS_SEARCH}?extra_properties={extra_props}"
+        data = await client._request("POST", url, json_body=body)
         if not isinstance(data, dict):
             break
         records = data.get("assets") or data.get("data") or data.get("records") or []
@@ -76,10 +80,24 @@ async def _pull_assets_for_source(client: TenableClient, source: str) -> dict[st
 
 
 def _asset_field(asset: dict[str, Any], *keys: str) -> Any:
-    """Try multiple key variants and return the first non-empty value."""
+    """Try multiple key variants and return the first non-empty value.
+
+    The Tenable One inventory search endpoint returns the rich fields
+    (ipv4_addresses, fqdns, device_system_type, ...) nested under an
+    'extra_properties' object — only when we passed those names in the
+    ?extra_properties=... query string of the request. We check the nested
+    object first, then fall back to root-level keys for backward compat
+    with other endpoints/responses that might use a flat shape.
+    """
+    extra = asset.get("extra_properties") or {}
+    for k in keys:
+        if k in extra:
+            v = extra[k]
+            if v not in (None, "", [], {}):
+                return v
     for k in keys:
         v = asset.get(k)
-        if v not in (None, "", []):
+        if v not in (None, "", [], {}):
             return v
     return None
 
@@ -91,6 +109,26 @@ def _join_arr(value: Any) -> str | None:
     if isinstance(value, list):
         return ",".join(str(v) for v in value) or None
     return str(value)
+
+
+def _format_os(value: Any) -> str | None:
+    """Normalize Tenable One's device_system_type to a customer-friendly form.
+
+    Tenable One returns values like 'microsoft windows computer', 'linux computer',
+    'apple os x computer' — verbose lowercase strings with a trailing ' computer'
+    that reads as awkward in a customer-facing report. We strip the suffix and
+    title-case the result, with a special case to keep 'OS' capitalized correctly.
+    """
+    if value is None or value == "":
+        return None
+    s = str(value).strip()
+    # Strip the trailing " computer" the platform appends to device entries.
+    if s.lower().endswith(" computer"):
+        s = s[: -len(" computer")].strip()
+    s = s.title()
+    # Title-case mangles all-caps acronyms; fix the common ones we know.
+    s = s.replace("Os X", "OS X").replace("Macos", "macOS")
+    return s or None
 
 
 async def run(settings: Settings, sources: list[str]) -> int:
@@ -165,13 +203,14 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
             conn.execute(
                 """
                 INSERT INTO assets (asset_id, asset_name, source, asset_class,
-                                    ipv4, fqdn, last_synced)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    ipv4, fqdn, operating_system, last_synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(asset_id) DO UPDATE SET
                     asset_name = excluded.asset_name,
                     asset_class = excluded.asset_class,
                     ipv4 = excluded.ipv4,
                     fqdn = excluded.fqdn,
+                    operating_system = excluded.operating_system,
                     last_synced = excluded.last_synced
                 """,
                 (
@@ -181,6 +220,7 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
                     _asset_field(asset, "asset_class", "class"),
                     _join_arr(_asset_field(asset, "ipv4_addresses", "ipv4")),
                     _join_arr(_asset_field(asset, "fqdns", "fqdn", "hostname")),
+                    _format_os(_asset_field(asset, "device_system_type")),
                     now,
                 ),
             )

@@ -61,6 +61,7 @@ class EnrichedFinding(BaseModel):
     asset_name: str | None
     asset_ipv4: str | None
     asset_fqdn: str | None
+    asset_operating_system: str | None = None
     first_observed: datetime | None
     last_observed: datetime | None
     cve_description: str | None
@@ -138,7 +139,7 @@ def _build_findings_query(
         SELECT
             f.finding_id, f.cve_id, f.severity, f.state, f.source,
             f.first_observed, f.last_observed,
-            a.asset_id, a.asset_name, a.ipv4 AS asset_ipv4, a.fqdn AS asset_fqdn,
+            a.asset_id, a.asset_name, a.ipv4 AS asset_ipv4, a.fqdn AS asset_fqdn, a.operating_system AS asset_operating_system,
             c.description AS cve_description,
             c.cvss3_base_score, c.cvss3_severity,
             c.vpr_score, c.vpr_severity,
@@ -320,9 +321,24 @@ def export_findings(
         source, cve, asset, severity, state, enriched, hide_no_plugins
     )
     sql += _build_order_by(sort)
+    data: list[dict[str, Any]] = []
     with get_connection(settings.database_path) as conn:
         rows = conn.execute(sql, params).fetchall()
-    data = [dict(r) for r in rows]
+        # Apply the same plugin-overlay the UI's /findings endpoint applies.
+        # cve_intel.vpr_score / vpr_severity / remediation are rarely populated
+        # by the public CVE scraper; the values the user actually sees in the UI
+        # come from the matched plugin, so the export must use the same source.
+        for r in rows:
+            fields = dict(r)
+            fields["enriched"] = bool(r["enriched"])
+            plugin = pick_best_plugin(conn, r["cve_id"], r["source"])
+            if plugin:
+                fields["vpr_score"] = plugin["vpr_score"]
+                fields["vpr_severity"] = plugin["vpr_severity"]
+                fields["remediation"] = plugin["solution"]
+                fields["plugin_id"] = plugin["plugin_id"]
+                fields["plugin_family"] = plugin["script_family"]
+            data.append(fields)
     if format == "json":
         return build_json_response(data)
     return build_csv_response(data)
