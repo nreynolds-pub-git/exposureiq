@@ -193,11 +193,11 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange, onE
                       source: f.source,
                       severity: f.severity ?? null,
                       vpr_score: f.vpr_score ?? null,
-                      cvss3_base_score: f.cvss3_base_score ?? null,
+                      cve_description: f.cve_description ?? null,
+                      remediation: f.remediation ?? null,
                       plugin_family: f.plugin_family ?? null,
                       plugin_platform_match: f.plugin_platform_match ?? null,
-                      remediation: f.remediation ?? null,
-                      cve_description: f.cve_description ?? null,
+                      asset_operating_system: f.asset_operating_system ?? null,
                     })
                   }
                   className="rounded-md border border-tenable-yellow/40 bg-tenable-yellow/10 px-2 py-1 text-xs text-tenable-black dark:text-tenable-yellow hover:bg-tenable-yellow/20 transition whitespace-nowrap"

@@ -19,6 +19,7 @@ export interface EnrichedFinding {
   asset_name: string | null;
   asset_ipv4: string | null;
   asset_fqdn: string | null;
+  asset_operating_system: string | null;
   first_observed: string | null;
   last_observed: string | null;
   cve_description: string | null;

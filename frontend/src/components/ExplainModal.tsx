@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { explainFinding, type ExplainContext } from '../lib/llm';
+import { categoryFor } from '../lib/sourceCategory';
 import { useApiKey } from '../lib/useApiKey';
 
 interface Props {
@@ -29,8 +30,9 @@ export function ExplainModal({ context, onClose, onOpenSettings }: Props) {
       setError('');
       return;
     }
-    // Key the cache on cve+asset since same CVE on different assets gets different context.
-    const fetchKey = `${context.cve_id}::${context.asset_name ?? ''}`;
+    // Key the cache on CVE alone — the new prompt is asset-agnostic, so the
+    // same explanation applies regardless of which asset the CVE was clicked on.
+    const fetchKey = context.cve_id;
     if (fetchKey === lastFetchedRef.current) return;
     lastFetchedRef.current = fetchKey;
 
@@ -66,16 +68,31 @@ export function ExplainModal({ context, onClose, onOpenSettings }: Props) {
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-tenable-black/20 dark:border-white/20 bg-white dark:bg-tenable-black p-6 text-tenable-black dark:text-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-baseline justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">{context.cve_id}</h2>
-            <div className="text-xs text-tenable-black/60 dark:text-white/60">
-              {context.asset_name ?? 'unknown asset'} · {context.source}
-            </div>
+        <div className="mb-4 flex items-start justify-between">
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold mb-3">{context.cve_id}</h2>
+            <dl className="grid grid-cols-4 gap-x-4 gap-y-1 text-xs">
+              <dt className="text-tenable-black/50 dark:text-white/40 uppercase tracking-wider">Severity</dt>
+              <dt className="text-tenable-black/50 dark:text-white/40 uppercase tracking-wider">VPR</dt>
+              <dt className="text-tenable-black/50 dark:text-white/40 uppercase tracking-wider">Source</dt>
+              <dt className="text-tenable-black/50 dark:text-white/40 uppercase tracking-wider">Asset</dt>
+              <dd className="text-tenable-black dark:text-white font-medium">
+                {context.severity ?? <span className="text-tenable-black/40 dark:text-white/30">—</span>}
+              </dd>
+              <dd className="text-tenable-black dark:text-white font-medium">
+                {context.vpr_score?.toFixed(1) ?? <span className="text-tenable-black/40 dark:text-white/30">—</span>}
+              </dd>
+              <dd className="text-tenable-black dark:text-white font-medium" title={`Connector: ${context.source}`}>
+                {categoryFor(context.source)}
+              </dd>
+              <dd className="text-tenable-black dark:text-white font-medium truncate" title={context.asset_name ?? ''}>
+                {context.asset_name ?? <span className="text-tenable-black/40 dark:text-white/30">—</span>}
+              </dd>
+            </dl>
           </div>
           <button
             onClick={onClose}
-            className="text-tenable-black/60 dark:text-white/60 hover:text-tenable-black dark:hover:text-white text-xl leading-none"
+            className="text-tenable-black/60 dark:text-white/60 hover:text-tenable-black dark:hover:text-white text-xl leading-none ml-3"
             aria-label="Close"
           >
             ×
