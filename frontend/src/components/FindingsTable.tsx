@@ -74,6 +74,7 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange, onE
                 <SortIndicator active={curKey === 'asset'} direction={curDir} />
               </button>
             </th>
+            <th className="px-3 py-2">Description</th>
             <th className="px-3 py-2">Source</th>
             <th className="px-3 py-2">VPR</th>
             <th className="px-3 py-2">
@@ -119,12 +120,24 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange, onE
                   {f.cve_id}
                 </a>
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-2 max-w-xs">
                 <div>{f.asset_name ?? <em className="text-tenable-black/50 dark:text-white/40">—</em>}</div>
                 {f.asset_ipv4 && (
                   <div className="text-xs text-tenable-black/50 dark:text-white/40">
                     {f.asset_ipv4}
                   </div>
+                )}
+              </td>
+              <td className="px-3 py-2 max-w-md">
+                {f.cve_description ? (
+                  <div
+                    className="line-clamp-2 text-xs text-tenable-black/80 dark:text-white/80"
+                    title={f.cve_description}
+                  >
+                    {f.cve_description}
+                  </div>
+                ) : (
+                  <span className="text-tenable-black/40 dark:text-white/30">—</span>
                 )}
               </td>
               <td className="px-3 py-2 text-tenable-black/80 dark:text-white/80">{f.source}</td>
