@@ -6,7 +6,6 @@ from t1_cve_enricher.workers.findings_extractor import (
     _asset_field,
     _extra,
     _extract_cves,
-    _join_arr,
 )
 
 
