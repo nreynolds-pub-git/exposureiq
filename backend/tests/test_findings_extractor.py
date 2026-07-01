@@ -39,11 +39,7 @@ class TestExtractCves:
         assert _extract_cves(f) == ["CVE-2024-1234"]
 
     def test_non_cve_strings_filtered(self) -> None:
-        f = {
-            "extra_properties": {
-                "finding_cves": ["CVE-2024-1234", "not-a-cve", "GHSA-1234"]
-            }
-        }
+        f = {"extra_properties": {"finding_cves": ["CVE-2024-1234", "not-a-cve", "GHSA-1234"]}}
         assert _extract_cves(f) == ["CVE-2024-1234"]
 
     def test_empty_array_returns_empty_list(self) -> None:
