@@ -58,11 +58,39 @@ export function FilterBar({ sources, stats, filters, onChange }: Props) {
         }
       >
         <option value="">All sources</option>
-        {sources.map((s) => (
-          <option key={s.name} value={s.name}>
-            {s.display_name ?? s.name}
-          </option>
-        ))}
+        {(() => {
+          // Split sources by whether they produced any CVE findings. Both
+          // groups stay alphabetical by display name (or name, when the
+          // display name is missing). Sources with zero findings are still
+          // listed — under a labeled divider — so the user can see the
+          // pipeline discovered them but they legitimately have no CVE data.
+          const label = (s: Source) => (s.display_name ?? s.name).toLowerCase();
+          const withFindings = sources
+            .filter((s) => (s.finding_count ?? 0) > 0)
+            .sort((a, b) => label(a).localeCompare(label(b)));
+          const withoutFindings = sources
+            .filter((s) => (s.finding_count ?? 0) === 0)
+            .sort((a, b) => label(a).localeCompare(label(b)));
+          const fmt = new Intl.NumberFormat();
+          return (
+            <>
+              {withFindings.map((s) => (
+                <option key={s.name} value={s.name}>
+                  {(s.display_name ?? s.name) + '  —  ' + fmt.format(s.finding_count)}
+                </option>
+              ))}
+              {withoutFindings.length > 0 && (
+                <optgroup label="No CVE findings">
+                  {withoutFindings.map((s) => (
+                    <option key={s.name} value={s.name}>
+                      {s.display_name ?? s.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </>
+          );
+        })()}
       </select>
 
       {/* Stats panel — reads from the source filter + stats endpoint */}

@@ -7,6 +7,7 @@ export interface Source {
   first_seen: string;
   last_seen: string;
   asset_count: number;
+  finding_count: number;
 }
 
 export interface EnrichedFinding {
@@ -26,7 +27,6 @@ export interface EnrichedFinding {
   cvss3_base_score: number | null;
   cvss3_severity: string | null;
   vpr_score: number | null;
-  vpr_severity: string | null;
   remediation: string | null;
   enriched: boolean;
   plugin_id: string | null;

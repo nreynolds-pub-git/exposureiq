@@ -49,6 +49,7 @@ class Source(BaseModel):
     first_seen: datetime
     last_seen: datetime
     asset_count: int
+    finding_count: int = 0
 
 
 class EnrichedFinding(BaseModel):
@@ -68,7 +69,6 @@ class EnrichedFinding(BaseModel):
     cvss3_base_score: float | None
     cvss3_severity: str | None
     vpr_score: float | None
-    vpr_severity: str | None
     remediation: str | None
     enriched: bool
     plugin_id: str | None = None
@@ -142,7 +142,7 @@ def _build_findings_query(
             a.asset_id, a.asset_name, a.ipv4 AS asset_ipv4, a.fqdn AS asset_fqdn, a.operating_system AS asset_operating_system,
             c.description AS cve_description,
             c.cvss3_base_score, c.cvss3_severity,
-            c.vpr_score, c.vpr_severity,
+            f.vpr_score, f.vpr2_score,
             c.remediation,
             CASE WHEN c.fetch_status = 'OK' THEN 1 ELSE 0 END AS enriched
         FROM findings f
@@ -160,7 +160,7 @@ def _build_findings_query(
 _SORT_EXPRESSIONS: dict[str, str] = {
     "asset": "a.asset_name COLLATE NOCASE",
     "cvss3": "c.cvss3_base_score",
-    # "vpr" intentionally not in this map — handled via subquery below
+    "vpr": "f.vpr_score",
     "severity": "f.severity",
 }
 
@@ -201,16 +201,6 @@ def _build_order_by(sort: str | None) -> str:
         # Cleanest: use a correlated subquery but cached via a SELECT
         # alias on the outer query. SQLite's query planner will
         # materialise it. We do this by injecting a subselect column.
-        return f""" ORDER BY (
-            SELECT max_vpr FROM (
-                SELECT cp.cve_id, MAX(p.vpr_score) AS max_vpr
-                FROM plugins p
-                JOIN cve_plugins cp ON cp.plugin_id = p.plugin_id
-                WHERE COALESCE(p.script_family, '') != 'Misc.'
-                GROUP BY cp.cve_id
-            ) mv WHERE mv.cve_id = f.cve_id
-        ) {direction} {nulls}, f.last_observed DESC"""
-
     expr = _SORT_EXPRESSIONS.get(key)
     if not expr:
         return default
@@ -259,7 +249,17 @@ def get_progress() -> Any:
 def list_sources() -> Any:  # -> list[Source] triggers FastAPI 0.137 dual-annotation bug
     settings = get_settings()
     with get_connection(settings.database_path) as conn:
-        rows = conn.execute("SELECT * FROM sources ORDER BY name").fetchall()
+        # LEFT JOIN so sources with zero CVE findings still appear in the
+        # dropdown — the UI groups them under a "No CVE findings" divider.
+        rows = conn.execute(
+            """
+            SELECT s.*, COUNT(f.finding_id) AS finding_count
+            FROM sources s
+            LEFT JOIN findings f ON f.source = s.name
+            GROUP BY s.name, s.display_name, s.first_seen, s.last_seen, s.asset_count
+            ORDER BY s.name
+            """
+        ).fetchall()
     return [Source(**dict(r)) for r in rows]
 
 
@@ -290,8 +290,8 @@ def list_findings(  # type: ignore[no-untyped-def]  # see list_sources note
             fields["enriched"] = bool(r["enriched"])
             plugin = pick_best_plugin(conn, r["cve_id"], r["source"])
             if plugin:
-                fields["vpr_score"] = plugin["vpr_score"]
-                fields["vpr_severity"] = plugin["vpr_severity"]
+                # VPR now comes from findings.vpr_score (per-finding, from the
+                # Tenable API); plugin.vpr_score is a fallback we no longer use.
                 fields["remediation"] = plugin["solution"]
                 fields["plugin_id"] = plugin["plugin_id"]
                 fields["plugin_family"] = plugin["script_family"]
@@ -333,8 +333,8 @@ def export_findings(
             fields["enriched"] = bool(r["enriched"])
             plugin = pick_best_plugin(conn, r["cve_id"], r["source"])
             if plugin:
-                fields["vpr_score"] = plugin["vpr_score"]
-                fields["vpr_severity"] = plugin["vpr_severity"]
+                # VPR now comes from findings.vpr_score (per-finding, from the
+                # Tenable API); plugin.vpr_score is a fallback we no longer use.
                 fields["remediation"] = plugin["solution"]
                 fields["plugin_id"] = plugin["plugin_id"]
                 fields["plugin_family"] = plugin["script_family"]

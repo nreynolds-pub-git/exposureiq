@@ -76,7 +76,15 @@ export function FindingsTable({ findings, loading, filters, onFiltersChange, onE
             </th>
             <th className="px-3 py-2">Description</th>
             <th className="px-3 py-2">Source</th>
-            <th className="px-3 py-2">VPR</th>
+            <th className="px-3 py-2">
+              <button
+                onClick={() => handleSort('vpr')}
+                className="inline-flex items-center uppercase tracking-wider hover:text-tenable-black dark:hover:text-white"
+              >
+                VPR
+                <SortIndicator active={curKey === 'vpr'} direction={curDir} />
+              </button>
+            </th>
             <th className="px-3 py-2">
               <button
                 onClick={() => handleSort('cvss3')}
