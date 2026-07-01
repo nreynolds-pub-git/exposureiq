@@ -316,6 +316,86 @@ class TenableClient:
                 break
         return asset_ids
 
+    # Properties that come back populated and useful when requested via
+    # extra_properties on /inventory/findings/search. Empirically verified
+    # against MICROSOFT:TVM, ORCA:CSPM, CY-COGNITO:DAST sources earlier.
+    # Notable: finding_solution and finding_cvss3_base_score are listed in
+    # the schema but never populate in responses; don't request them here.
+    FINDING_EXTRA_PROPERTIES = (
+        "finding_cves",
+        "finding_description",
+        "finding_vpr_score",
+        "finding_vpr2_score",
+        "first_observed_at",
+        "last_observed_at",
+    )
+
+    async def search_findings_for_source(
+        self,
+        source_value: str,
+        *,
+        max_findings: int = 500_000,
+    ) -> list[dict[str, Any]]:
+        """Return finding records for a source with rich extra_properties.
+
+        Paginates internally via offset/limit (1000 records per page).
+        Returns the raw finding records; caller is responsible for extracting
+        CVEs from the `extra_properties.finding_cves` array and exploding
+        multi-CVE findings.
+
+        `source_value` is the `products` enum value (e.g. 'ORCA:CSPM',
+        'MICROSOFT:TVM', 'CY-COGNITO:DAST'). NOTE: the filter property name
+        on this endpoint is `product` (singular), unlike the assets endpoint
+        which uses `products` (plural).
+
+        max_findings is a soft cap to prevent runaway pagination on enormous
+        sources during testing. Production should leave it at the default.
+        """
+        extra = ",".join(self.FINDING_EXTRA_PROPERTIES)
+
+        findings: list[dict[str, Any]] = []
+        offset = 0
+        page_size = 1000
+        while offset < max_findings:
+            # CRITICAL: limit/offset MUST be in the URL query string, NOT the
+            # POST body. The endpoint silently ignores body pagination and
+            # treats every request as offset=0. Verified empirically.
+            url = (
+                f"{INVENTORY_FINDINGS_SEARCH}"
+                f"?extra_properties={extra}"
+                f"&limit={page_size}"
+                f"&offset={offset}"
+            )
+            body = {
+                "filters": [
+                    {"property": "product", "operator": "=", "value": [source_value]},
+                ],
+            }
+            data = await self._request("POST", url, json_body=body)
+            if not isinstance(data, dict):
+                break
+            records = data.get("data") or []
+            if not records:
+                break
+            findings.extend(records)
+            total = int((data.get("pagination") or {}).get("total", 0) or 0)
+            offset += len(records)
+            logger.info(
+                "findings page",
+                source=source_value,
+                offset=offset,
+                returned=len(records),
+                total=total,
+            )
+            if offset >= total:
+                break
+        logger.info(
+            "findings search complete",
+            source=source_value,
+            count=len(findings),
+        )
+        return findings
+
     async def _initiate_export(self, filters: list[dict[str, Any]]) -> str:
         body = {"filters": filters}
         data = await self._request("POST", FINDINGS_EXPORT_INITIATE, json_body=body)

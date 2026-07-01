@@ -35,18 +35,41 @@ logger = structlog.get_logger(__name__)
 CVE_PATTERN = re.compile(r"^CVE-\d{4}-\d{4,}$", re.IGNORECASE)
 
 
-def _extract_cve_id(finding: dict[str, Any]) -> str | None:
-    """Pull the CVE ID out of a finding record, or None if it isn't CVE-shaped."""
-    candidates = [
-        finding.get("finding_detection_name"),
-        finding.get("finding_name"),
-        finding.get("detection_name"),
-        finding.get("name"),
-    ]
-    for c in candidates:
-        if c and CVE_PATTERN.match(str(c).strip()):
-            return str(c).strip().upper()
-    return None
+def _extract_cves(finding: dict[str, Any]) -> list[str]:
+    """Pull the CVE list off a finding record.
+
+    The authoritative source is `extra_properties.finding_cves`, which is an
+    array of CVE strings. Some sources (e.g. Microsoft TVM) also put a single
+    CVE in `finding_name` or `finding_detection_name`, but that pattern is
+    inconsistent across connectors and can't represent multi-CVE findings.
+
+    Returns a deduplicated, uppercase list. Empty list means the finding
+    isn't CVE-shaped (e.g. an Orca malware detection or a misconfig) and
+    should be filtered out by the caller.
+    """
+    extra = finding.get("extra_properties") or {}
+    raw = extra.get("finding_cves") or []
+    if not isinstance(raw, list):
+        return []
+
+    # Deduplicate while preserving order — some connectors list the same CVE
+    # multiple times in the array (unclear why, but it happens).
+    seen: set[str] = set()
+    cves: list[str] = []
+    for c in raw:
+        if not c:
+            continue
+        normalized = str(c).strip().upper()
+        if CVE_PATTERN.match(normalized) and normalized not in seen:
+            seen.add(normalized)
+            cves.append(normalized)
+    return cves
+
+
+def _extra(finding: dict[str, Any], key: str) -> Any:
+    """Read a field from a finding's extra_properties dict, or None."""
+    extra = finding.get("extra_properties") or {}
+    return extra.get(key)
 
 
 async def _pull_assets_for_source(client: TenableClient, source: str) -> dict[str, dict[str, Any]]:
@@ -170,33 +193,52 @@ async def run(settings: Settings, sources: list[str]) -> int:
 
 
 async def _pull_one_source(settings: Settings, source: str) -> int:
-    """Pull and persist data for a single source."""
+    """Pull and persist data for a single source.
+
+    For each source we:
+    1. Pull assets (with rich extra_properties for IPv4/FQDN/OS enrichment)
+    2. Pull findings via /inventory/findings/search with extra_properties
+       (gets us finding_cves array, VPR, description, observation dates in
+       one call — no second-stage enrichment needed for these fields)
+    3. Filter to findings that carry at least one CVE in finding_cves
+       (drops malware detections, misconfigs, and anything else not CVE-shaped)
+    4. Explode multi-CVE findings into one DB row per (finding, cve) pair
+
+    Returns the number of DB rows persisted (which is >= the number of CVE-shaped
+    findings because of the explosion).
+    """
     logger.info("pulling source", source=source)
     async with TenableClient(settings) as client:
         assets = await _pull_assets_for_source(client, source)
-        asset_ids = list(assets.keys())
-        if not asset_ids:
-            logger.warning("source has no assets; skipping findings export", source=source)
+        if not assets:
+            logger.warning("source has no assets; skipping findings pull", source=source)
             return 0
-        findings = await client.export_findings(asset_ids=asset_ids)
+        findings = await client.search_findings_for_source(source)
 
-    cve_findings = []
+    # Filter and explode. One Tenable finding with N CVEs becomes N rows.
+    exploded: list[tuple[dict[str, Any], str]] = []
+    findings_with_cves = 0
     for f in findings:
-        cve_id = _extract_cve_id(f)
-        if cve_id:
-            f["_cve_id"] = cve_id
-            cve_findings.append(f)
+        cves = _extract_cves(f)
+        if not cves:
+            continue
+        findings_with_cves += 1
+        for cve_id in cves:
+            exploded.append((f, cve_id))
 
     logger.info(
         "filtered findings",
         source=source,
         assets=len(assets),
         total_findings=len(findings),
-        cve_findings=len(cve_findings),
+        findings_with_cves=findings_with_cves,
+        findings_dropped_no_cve=len(findings) - findings_with_cves,
+        rows_after_explode=len(exploded),
     )
 
     now = datetime.now(UTC)
     persisted = 0
+    skipped_no_asset = 0
     with get_connection(settings.database_path) as conn:
         # Upsert assets first
         for asset_id, asset in assets.items():
@@ -226,36 +268,53 @@ async def _pull_one_source(settings: Settings, source: str) -> int:
             )
 
         # Then findings. If a finding references an asset we don't have in our
-        # local store, skip it — the foreign key would fail anyway.
-        for f in cve_findings:
+        # local store, skip it — the foreign key would fail anyway. This can
+        # happen when the asset pull and findings pull race (rare but possible).
+        for f, cve_id in exploded:
             asset_id_raw = f.get("asset_id")
             if not asset_id_raw or asset_id_raw not in assets:
+                skipped_no_asset += 1
                 continue
             finding_asset_id: str = str(asset_id_raw)
             conn.execute(
                 """
-                INSERT INTO findings (finding_id, asset_id, cve_id, severity, state,
-                                      first_observed, last_observed, source, last_synced)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(finding_id) DO UPDATE SET
+                INSERT INTO findings (
+                    finding_id, asset_id, cve_id, severity, state,
+                    first_observed, last_observed, source,
+                    vpr_score, vpr2_score, finding_description,
+                    last_synced
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(finding_id, cve_id) DO UPDATE SET
                     severity = excluded.severity,
                     state = excluded.state,
                     last_observed = excluded.last_observed,
+                    vpr_score = excluded.vpr_score,
+                    vpr2_score = excluded.vpr2_score,
+                    finding_description = excluded.finding_description,
                     last_synced = excluded.last_synced
                 """,
                 (
-                    f.get("finding_id") or f.get("id"),
+                    f.get("id") or f.get("finding_id"),
                     finding_asset_id,
-                    f["_cve_id"],
-                    f.get("finding_severity") or f.get("severity"),
+                    cve_id,
+                    f.get("severity") or f.get("finding_severity"),
                     f.get("state"),
-                    f.get("first_observed_at") or f.get("first_observed"),
-                    f.get("last_observed_at") or f.get("last_observed"),
+                    _extra(f, "first_observed_at"),
+                    _extra(f, "last_observed_at"),
                     source,
+                    _extra(f, "finding_vpr_score"),
+                    _extra(f, "finding_vpr2_score"),
+                    _extra(f, "finding_description"),
                     now,
                 ),
             )
             persisted += 1
 
-    logger.info("source persisted", source=source, findings=persisted)
+    logger.info(
+        "source persisted",
+        source=source,
+        rows_persisted=persisted,
+        rows_skipped_missing_asset=skipped_no_asset,
+    )
     return persisted

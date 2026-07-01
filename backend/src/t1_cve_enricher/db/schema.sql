@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_name ON assets(asset_name);
 
 -- CVE-shaped findings attached to assets
 CREATE TABLE IF NOT EXISTS findings (
-    finding_id TEXT PRIMARY KEY,
+    finding_id TEXT NOT NULL,
     asset_id TEXT NOT NULL,
     cve_id TEXT NOT NULL,
     severity TEXT,
@@ -41,7 +41,18 @@ CREATE TABLE IF NOT EXISTS findings (
     first_observed TIMESTAMP,
     last_observed TIMESTAMP,
     source TEXT NOT NULL,
+    -- VPR scores live on the finding (per Tenable's data model) — sourced
+    -- from findings/search extra_properties, refreshed every pipeline run.
+    vpr_score REAL,
+    vpr2_score REAL,
+    -- Tenable-curated finding description, also from findings/search.
+    -- Distinct from cve_intel.description (NVD-style, from scraper):
+    -- this is the per-finding Tenable interpretation.
+    finding_description TEXT,
     last_synced TIMESTAMP NOT NULL,
+    -- Composite primary key: one finding can reference multiple CVEs
+    -- (the finding_cves array). We explode to one row per (finding, cve).
+    PRIMARY KEY (finding_id, cve_id),
     FOREIGN KEY (asset_id) REFERENCES assets(asset_id)
 );
 
