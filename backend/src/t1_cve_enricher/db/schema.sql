@@ -10,6 +10,13 @@ PRAGMA journal_mode = WAL;
 -- Third-party data sources discovered in Tenable One
 CREATE TABLE IF NOT EXISTS sources (
     name TEXT PRIMARY KEY,
+    -- Human-readable label (e.g. "Red Hat Insights"). Populated by
+    -- source_discovery from the connector's `name` field, distinct from
+    -- the machine-readable `name` column (e.g. "RED-HAT:VM"). Nullable
+    -- because older rows created before this column existed have NULL,
+    -- and because we don't want the INSERT to hard-fail if Tenable ever
+    -- returns a source without a human-readable name.
+    display_name TEXT,
     first_seen TIMESTAMP NOT NULL,
     last_seen TIMESTAMP NOT NULL,
     asset_count INTEGER NOT NULL DEFAULT 0

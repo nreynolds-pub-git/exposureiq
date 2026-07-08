@@ -51,12 +51,66 @@ sqlite3.register_converter("TIMESTAMP", _parse_timestamp)
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
+# Columns that must exist on each table for the app to function.
+# Format: table_name -> list of (column_name, column_definition).
+# `column_definition` is the raw SQL used in ALTER TABLE ADD COLUMN when the
+# column is missing — so it must be a valid, nullable-safe definition
+# (no NOT NULL without a default). This list is the source of truth that
+# schema.sql is checked against at startup.
+_EXPECTED_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "sources": [
+        ("display_name", "TEXT"),
+    ],
+    "findings": [
+        ("vpr_score", "REAL"),
+        ("vpr2_score", "REAL"),
+        ("finding_description", "TEXT"),
+    ],
+    # Add more (table, column, definition) rows here as the schema evolves.
+    # If a column is required (NOT NULL without a sensible default), you'll
+    # need a real migration — this guard only handles nullable additions.
+}
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    """Verify expected columns exist on each table; add missing nullables.
+
+    This is a lightweight self-healing step for schema drift between the
+    running code and schema.sql. If a column exists in _EXPECTED_COLUMNS
+    but not in the actual table, we ALTER TABLE to add it. Safe for
+    nullable columns; unsafe patterns (NOT NULL without default) should
+    prompt a real migration instead of being handled here.
+    """
+    for table, columns in _EXPECTED_COLUMNS.items():
+        # PRAGMA table_info returns (cid, name, type, notnull, dflt, pk) per column
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if not existing:
+            # Table doesn't exist at all — schema.sql didn't create it.
+            # This is a real bug (either schema.sql is broken or the table
+            # was renamed without updating _EXPECTED_COLUMNS). Fail loudly.
+            raise RuntimeError(
+                f"Schema check failed: table '{table}' does not exist. "
+                f"Check backend/src/t1_cve_enricher/db/schema.sql."
+            )
+        for col_name, col_def in columns:
+            if col_name not in existing:
+                logger.warning(
+                    "schema drift: adding missing column",
+                    table=table,
+                    column=col_name,
+                    definition=col_def,
+                )
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
+
+
 def init_db(db_path: Path) -> None:
-    """Create the SQLite file (if missing) and apply the schema."""
+    """Create the SQLite file (if missing), apply the schema, and reconcile columns."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     schema_sql = SCHEMA_PATH.read_text()
     with sqlite3.connect(db_path) as conn:
         conn.executescript(schema_sql)
+        _ensure_columns(conn)
+        conn.commit()
     logger.info("db initialised", path=str(db_path))
 
 
